@@ -9,7 +9,7 @@ import { DashboardView } from './components/DashboardView';
 import { SitePlannerView } from './components/SitePlannerView';
 import { CableEstimatorView } from './components/CableEstimatorView';
 import { generateUnifiedPDF } from './utils/pdfGenerator';
-import { LayoutDashboard, Map as MapIcon, Download, Loader2, Plus, FolderOpen, Cloud, RefreshCw, AlertTriangle, Play, ChevronRight, FileCode, LogOut, Search, X } from 'lucide-react';
+import { LayoutDashboard, Map as MapIcon, Download, Loader2, Plus, FolderOpen, Cloud, RefreshCw, AlertTriangle, Play, ChevronRight, FileCode, LogOut, Search, X, Github, GitBranch } from 'lucide-react';
 import {
   initAuth,
   googleSignIn,
@@ -214,6 +214,59 @@ export default function App() {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastAutoSaved, setLastAutoSaved] = useState<Date | null>(null);
   const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
+
+  // Git synchronization states
+  const [gitStatus, setGitStatus] = useState<{ hasChanges: boolean; changes: string[] } | null>(null);
+  const [isPushingToGit, setIsPushingToGit] = useState(false);
+  const [gitPushMessage, setGitPushMessage] = useState<string>('Sync changes from AI Studio');
+  const [gitResult, setGitResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showGitModal, setShowGitModal] = useState(false);
+
+  // Fetch git status
+  const checkGitStatus = async () => {
+    try {
+      const res = await fetch("/api/github/status");
+      const data = await res.json();
+      if (data.success) {
+        setGitStatus({
+          hasChanges: data.hasChanges,
+          changes: data.changes,
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching git status:", err);
+    }
+  };
+
+  useEffect(() => {
+    checkGitStatus();
+    // Check periodically every 15 seconds
+    const interval = setInterval(checkGitStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleGitPush = async (commitMessage: string) => {
+    setIsPushingToGit(true);
+    setGitResult(null);
+    try {
+      const res = await fetch("/api/github/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commitMessage }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGitResult({ success: true, message: "Successfully pushed to GitHub! Your changes will be live shortly." });
+        checkGitStatus(); // Refresh status
+      } else {
+        setGitResult({ success: false, message: `Failed: ${data.error || "Unknown error"}` });
+      }
+    } catch (err: any) {
+      setGitResult({ success: false, message: `Network error: ${err.message || err}` });
+    } finally {
+      setIsPushingToGit(false);
+    }
+  };
 
   const landingFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -805,6 +858,40 @@ export default function App() {
           </div>
         </div>
 
+        {/* Manual GitHub Sync Section */}
+        <div className="p-6 border-t border-neutral-900 bg-neutral-950/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase text-neutral-500 tracking-wider flex items-center gap-1">
+              <Github size={12} />
+              GitHub Deployment
+            </span>
+            {gitStatus?.hasChanges ? (
+              <span className="text-[8px] bg-red-500/20 text-red-400 font-bold px-1.5 py-0.5 rounded-full border border-red-500/30 animate-pulse">
+                Pending Changes
+              </span>
+            ) : (
+              <span className="text-[8px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+                Synced
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setGitResult(null);
+              setGitPushMessage('Sync changes from AI Studio');
+              setShowGitModal(true);
+            }}
+            className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              gitStatus?.hasChanges
+                ? 'bg-neutral-850 hover:bg-neutral-850 text-amber-400 border border-amber-400/30 shadow-lg shadow-amber-500/5'
+                : 'bg-neutral-900 hover:bg-neutral-850 text-neutral-400 border border-neutral-800'
+            }`}
+          >
+            <GitBranch size={13} />
+            {gitStatus?.hasChanges ? 'Deploy to GitHub' : 'Deploy to GitHub'}
+          </button>
+        </div>
+
         {/* Global Unified PDF Report Export */}
         <div className="p-6 border-t border-neutral-900 bg-neutral-950">
           <button
@@ -857,6 +944,134 @@ export default function App() {
         id="pdf-render-zone"
         className="fixed top-0 left-0 w-[800px] bg-white text-black z-[-1] opacity-0 pointer-events-none"
       />
+
+      {/* GitHub Sync Modal */}
+      {showGitModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-neutral-950 border border-neutral-900 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-neutral-900 flex items-center justify-between bg-neutral-950">
+              <div className="flex items-center gap-2 text-white">
+                <Github size={18} className="text-amber-400" />
+                <span className="font-black text-sm uppercase tracking-wider">Push to GitHub</span>
+              </div>
+              {!isPushingToGit && (
+                <button
+                  onClick={() => setShowGitModal(false)}
+                  className="text-neutral-500 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              {isPushingToGit ? (
+                <div className="py-10 flex flex-col items-center justify-center text-center space-y-4">
+                  <Loader2 size={40} className="text-amber-400 animate-spin" />
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Deploying changes...</h3>
+                    <p className="text-xs text-neutral-500 mt-1">Staging files and pushing to production repository branch.</p>
+                  </div>
+                </div>
+              ) : gitResult ? (
+                <div className="py-6 flex flex-col items-center justify-center text-center space-y-4">
+                  {gitResult.success ? (
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400">
+                      <AlertTriangle size={24} />
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                      {gitResult.success ? 'Sync Completed!' : 'Sync Failed'}
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-2 leading-relaxed px-4">
+                      {gitResult.message}
+                    </p>
+                  </div>
+
+                  <div className="pt-4 w-full">
+                    <button
+                      onClick={() => {
+                        setShowGitModal(false);
+                        setGitResult(null);
+                      }}
+                      className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-850 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-neutral-800 cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-2">
+                      Modified Files ({gitStatus?.changes?.length || 0})
+                    </span>
+                    <div className="bg-neutral-900 border border-neutral-850 rounded-xl p-3 max-h-36 overflow-y-auto font-mono text-[10px] text-neutral-400 space-y-1">
+                      {gitStatus?.changes && gitStatus.changes.length > 0 ? (
+                        gitStatus.changes.map((change, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className={`font-bold uppercase ${
+                              change.startsWith('M') ? 'text-amber-400' :
+                              change.startsWith('A') || change.includes('??') ? 'text-emerald-400' : 'text-red-400'
+                            }`}>
+                              {change.slice(0, 2)}
+                            </span>
+                            <span className="truncate">{change.slice(2)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-neutral-600 py-4 uppercase tracking-wider">
+                          No pending changes
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">
+                      Commit Message
+                    </label>
+                    <input
+                      type="text"
+                      value={gitPushMessage}
+                      onChange={(e) => setGitPushMessage(e.target.value)}
+                      placeholder="e.g. Update grain bin dimensions"
+                      className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-white focus:border-amber-400 outline-none transition-all font-semibold"
+                    />
+                  </div>
+
+                  <div className="pt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowGitModal(false)}
+                      className="flex-1 py-2.5 bg-neutral-900 hover:bg-neutral-850 text-neutral-400 hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-neutral-800 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGitPush(gitPushMessage)}
+                      className="flex-1 py-2.5 bg-amber-400 hover:bg-amber-300 text-black rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-amber-400/10 cursor-pointer"
+                    >
+                      Push & Deploy
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
