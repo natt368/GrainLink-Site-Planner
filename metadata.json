@@ -1,0 +1,6 @@
+{
+  "name": "GrainLink Site Planner",
+  "description": "Unified engineering and site design suite for planning grain bin storage layouts and cable arrangements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
