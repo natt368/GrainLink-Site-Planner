@@ -802,12 +802,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   )}
                 </div>
               </div>
-              {lastSavedTime && (
-                <div className="text-[10px] text-neutral-500 font-semibold uppercase tracking-wider pl-1 flex items-center gap-1.5">
-                  <span className="h-1 w-1 bg-emerald-500 rounded-full animate-pulse" />
-                  <span>Last backup: <span className="font-mono text-neutral-300">{lastSavedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></span>
-                </div>
-              )}
             </div>
 
             {/* 2. Import JSON file */}
