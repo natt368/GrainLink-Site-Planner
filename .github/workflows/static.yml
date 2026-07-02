@@ -31,9 +31,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci # This cleanly installs your package.json dependencies
+
       - name: Build website with Vite
-        run: npm run build
+        run: npm run build # This compiles your .tsx files into a 'dist' folder
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -41,7 +42,7 @@ jobs:
       - name: Upload compiled assets
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
+          path: './dist' # This uploads the compiled code instead of raw files
 
       - name: Deploy to GitHub Pages
         id: deployment
