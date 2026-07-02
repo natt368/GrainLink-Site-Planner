@@ -728,7 +728,6 @@ export default function App() {
               Grain<span className="text-amber-400">Link</span>
             </span>
           </div>
-          <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest mt-2 group-hover:text-neutral-400 transition-colors">Site Planner</p>
 
           {/* Minimalist Auto-Save Indicator */}
           <div 
