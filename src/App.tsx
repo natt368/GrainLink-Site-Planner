@@ -221,6 +221,27 @@ export default function App() {
   const [gitPushMessage, setGitPushMessage] = useState<string>('Sync changes from AI Studio');
   const [gitResult, setGitResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showGitModal, setShowGitModal] = useState(false);
+  const [isDevMode, setIsDevMode] = useState(false);
+
+  // Check if current user is developer
+  useEffect(() => {
+    // Check url param
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('dev') === 'true') {
+      localStorage.setItem('grainlink_dev_mode', 'true');
+    } else if (params.get('dev') === 'false') {
+      localStorage.removeItem('grainlink_dev_mode');
+    }
+
+    const isLocalDev = (import.meta as any).env?.DEV || 
+                       window.location.hostname.includes('ais-dev') || 
+                       window.location.hostname.includes('localhost') || 
+                       window.location.hostname.includes('127.0.0.1');
+    const isDevEmail = landingUser?.email === 'nat@grainlink.com';
+    const isDevStored = localStorage.getItem('grainlink_dev_mode') === 'true';
+
+    setIsDevMode(isLocalDev || isDevEmail || isDevStored);
+  }, [landingUser]);
 
   // Fetch git status
   const checkGitStatus = async () => {
@@ -859,38 +880,40 @@ export default function App() {
         </div>
 
         {/* Manual GitHub Sync Section */}
-        <div className="p-6 border-t border-neutral-900 bg-neutral-950/20 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase text-neutral-500 tracking-wider flex items-center gap-1">
-              <Github size={12} />
-              GitHub Deployment
-            </span>
-            {gitStatus?.hasChanges ? (
-              <span className="text-[8px] bg-red-500/20 text-red-400 font-bold px-1.5 py-0.5 rounded-full border border-red-500/30 animate-pulse">
-                Pending Changes
+        {isDevMode && (
+          <div className="p-6 border-t border-neutral-900 bg-neutral-950/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-neutral-500 tracking-wider flex items-center gap-1">
+                <Github size={12} />
+                GitHub Deployment
               </span>
-            ) : (
-              <span className="text-[8px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
-                Synced
-              </span>
-            )}
+              {gitStatus?.hasChanges ? (
+                <span className="text-[8px] bg-red-500/20 text-red-400 font-bold px-1.5 py-0.5 rounded-full border border-red-500/30 animate-pulse">
+                  Pending Changes
+                </span>
+              ) : (
+                <span className="text-[8px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+                  Synced
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setGitResult(null);
+                setGitPushMessage('Sync changes from AI Studio');
+                setShowGitModal(true);
+              }}
+              className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                gitStatus?.hasChanges
+                  ? 'bg-neutral-850 hover:bg-neutral-850 text-amber-400 border border-amber-400/30 shadow-lg shadow-amber-500/5'
+                  : 'bg-neutral-900 hover:bg-neutral-850 text-neutral-400 border border-neutral-800'
+              }`}
+            >
+              <GitBranch size={13} />
+              {gitStatus?.hasChanges ? 'Deploy to GitHub' : 'Deploy to GitHub'}
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setGitResult(null);
-              setGitPushMessage('Sync changes from AI Studio');
-              setShowGitModal(true);
-            }}
-            className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              gitStatus?.hasChanges
-                ? 'bg-neutral-850 hover:bg-neutral-850 text-amber-400 border border-amber-400/30 shadow-lg shadow-amber-500/5'
-                : 'bg-neutral-900 hover:bg-neutral-850 text-neutral-400 border border-neutral-800'
-            }`}
-          >
-            <GitBranch size={13} />
-            {gitStatus?.hasChanges ? 'Deploy to GitHub' : 'Deploy to GitHub'}
-          </button>
-        </div>
+        )}
 
         {/* Global Unified PDF Report Export */}
         <div className="p-6 border-t border-neutral-900 bg-neutral-950">
