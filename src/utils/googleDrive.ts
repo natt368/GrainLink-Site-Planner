@@ -33,7 +33,7 @@ const getStoredToken = (): string | null => {
   return null;
 };
 
-const storeToken = (token: string, expiryDurationMs: number = 24 * 60 * 60 * 1000) => {
+const storeToken = (token: string, expiryDurationMs: number = 55 * 60 * 1000) => {
   try {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(EXPIRY_KEY, (Date.now() + expiryDurationMs).toString());
@@ -185,6 +185,10 @@ export const saveProjectToDrive = async (accessToken: string, project: Project):
       body: JSON.stringify(project),
     });
     
+    if (updateRes.status === 401) {
+      throw new Error('Google session expired (1 hour limit). Please click "Connect" again to quickly re-authorize your session.');
+    }
+    
     if (!updateRes.ok) {
       const errorBody = await updateRes.text();
       if (errorBody.includes('404')) {
@@ -209,6 +213,10 @@ export const saveProjectToDrive = async (accessToken: string, project: Project):
         parents: [folderId],
       }),
     });
+    
+    if (createMetaRes.status === 401) {
+      throw new Error('Google session expired (1 hour limit). Please click "Connect" again to quickly re-authorize your session.');
+    }
     
     if (!createMetaRes.ok) {
       const errorBody = await createMetaRes.text();
@@ -236,6 +244,10 @@ To fix this:
       },
       body: JSON.stringify(project),
     });
+    
+    if (uploadRes.status === 401) {
+      throw new Error('Google session expired (1 hour limit). Please click "Connect" again to quickly re-authorize your session.');
+    }
     
     if (!uploadRes.ok) {
       const errorBody = await uploadRes.text();

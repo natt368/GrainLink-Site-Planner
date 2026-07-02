@@ -73,6 +73,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     } catch (err: any) {
       console.error(err);
       setDriveError(err.message || 'Failed to list designs from Google Drive');
+      if (err.message?.includes('expired') || err.message?.includes('re-authorize') || err.message?.includes('401') || err.status === 401) {
+        logout().catch(console.error);
+        setUser(null);
+        setAccessToken(null);
+        setDriveFiles([]);
+      }
     } finally {
       setIsLoadingDrive(false);
     }
@@ -120,6 +126,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       fetchDriveFiles(accessToken);
     } catch (err: any) {
       setDriveError(err.message || 'Failed to save to Google Drive');
+      if (err.message?.includes('expired') || err.message?.includes('re-authorize') || err.message?.includes('401') || err.status === 401) {
+        logout().catch(console.error);
+        setUser(null);
+        setAccessToken(null);
+        setDriveFiles([]);
+      }
     } finally {
       setIsSavingDrive(false);
     }
@@ -159,6 +171,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       fetchDriveFiles(currentToken);
     } catch (err: any) {
       setDriveError(err.message || 'Failed to save to Google Drive');
+      if (err.message?.includes('expired') || err.message?.includes('re-authorize') || err.message?.includes('401') || err.status === 401) {
+        logout().catch(console.error);
+        setUser(null);
+        setAccessToken(null);
+        setDriveFiles([]);
+      }
     } finally {
       setIsSavingDrive(false);
     }
@@ -178,6 +196,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setTimeout(() => setDriveSuccessMessage(null), 4000);
     } catch (err: any) {
       setDriveError(err.message || 'Failed to load design');
+      if (err.message?.includes('expired') || err.message?.includes('re-authorize') || err.message?.includes('401') || err.status === 401) {
+        logout().catch(console.error);
+        setUser(null);
+        setAccessToken(null);
+        setDriveFiles([]);
+      }
     } finally {
       setIsLoadingDrive(false);
     }
