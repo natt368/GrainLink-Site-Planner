@@ -683,7 +683,7 @@ export default function App() {
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-neutral-700"></span>
               )}
             </span>
-            <span className="text-[10px] font-semibold lowercase shrink-0 flex items-center gap-1">
+            <span className="text-[10px] font-semibold uppercase shrink-0 flex items-center gap-1">
               {isAutoSaving ? (
                 <span className="text-amber-500 animate-pulse">saving...</span>
               ) : landingToken ? (
