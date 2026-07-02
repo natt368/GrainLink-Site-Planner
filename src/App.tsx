@@ -237,10 +237,8 @@ export default function App() {
                        window.location.hostname.includes('ais-dev') || 
                        window.location.hostname.includes('localhost') || 
                        window.location.hostname.includes('127.0.0.1');
-    const isDevEmail = landingUser?.email === 'nat@grainlink.com';
-    const isDevStored = localStorage.getItem('grainlink_dev_mode') === 'true';
 
-    setIsDevMode(isLocalDev || isDevEmail || isDevStored);
+    setIsDevMode(isLocalDev);
   }, [landingUser]);
 
   // Fetch git status
