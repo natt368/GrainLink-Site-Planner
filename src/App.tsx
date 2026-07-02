@@ -967,7 +967,7 @@ export default function App() {
       />
 
       {/* GitHub Sync Modal */}
-      {showGitModal && (
+      {showGitModal && isDevMode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-neutral-950 border border-neutral-900 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}

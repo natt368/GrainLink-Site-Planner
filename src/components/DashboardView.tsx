@@ -711,11 +711,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="flex-1 max-w-sm flex flex-col gap-4 overflow-hidden shrink-0">
         {/* Save / Load Project File Actions */}
         <div className="bg-neutral-950 rounded-2xl border border-neutral-900 p-5 flex flex-col gap-3.5">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
-              Design Actions
-            </h3>
-            {accessToken && (
+          {accessToken && (
+            <div className="flex items-center justify-end mb-1">
               <button
                 onClick={handleDisconnectDrive}
                 className="text-[9px] font-bold text-neutral-500 hover:text-red-400 uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer"
@@ -724,8 +721,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <LogOut size={10} />
                 Disconnect
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {driveError && (
             <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2 text-[10px] text-red-400">
@@ -800,23 +797,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* 2. Import JSON file */}
-            <button
-              onClick={handleTriggerLoad}
-              className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800 text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
-              title="Import design from a local JSON file"
-            >
-              <FolderOpen size={14} className="text-amber-400" />
-              Import JSON File
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".json"
-              onChange={handleLoadProjectJSON}
-            />
 
             {/* 3. Export JSON file */}
             <button
