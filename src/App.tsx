@@ -9,7 +9,7 @@ import { DashboardView } from './components/DashboardView';
 import { SitePlannerView } from './components/SitePlannerView';
 import { CableEstimatorView } from './components/CableEstimatorView';
 import { generateUnifiedPDF } from './utils/pdfGenerator';
-import { LayoutDashboard, Map as MapIcon, Download, Loader2, Plus, FolderOpen, Cloud, RefreshCw, AlertTriangle, Play, ChevronRight, FileCode, LogOut, Search, X, Github, GitBranch } from 'lucide-react';
+import { LayoutDashboard, Map as MapIcon, Download, Loader2, Plus, FolderOpen, Cloud, RefreshCw, AlertTriangle, Play, ChevronRight, FileCode, LogOut, Search, X, Github, GitBranch, Home } from 'lucide-react';
 import {
   initAuth,
   googleSignIn,
@@ -245,15 +245,24 @@ export default function App() {
   const checkGitStatus = async () => {
     try {
       const res = await fetch("/api/github/status");
-      const data = await res.json();
-      if (data.success) {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (jsonErr) {
+        throw new Error(text.slice(0, 100) || "Invalid JSON response");
+      }
+      if (data && data.success) {
         setGitStatus({
           hasChanges: data.hasChanges,
           changes: data.changes,
         });
       }
     } catch (err) {
-      console.error("Error fetching git status:", err);
+      console.warn("Error fetching git status (rate limit or connection issue):", err);
     }
   };
 
@@ -273,15 +282,21 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commitMessage }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (jsonErr) {
+        throw new Error(text.slice(0, 100) || "Invalid JSON response");
+      }
+      if (data && data.success) {
         setGitResult({ success: true, message: "Successfully pushed to GitHub! Your changes will be live shortly." });
         checkGitStatus(); // Refresh status
       } else {
-        setGitResult({ success: false, message: `Failed: ${data.error || "Unknown error"}` });
+        setGitResult({ success: false, message: `Failed: ${data?.error || "Unknown error"}` });
       }
     } catch (err: any) {
-      setGitResult({ success: false, message: `Network error: ${err.message || err}` });
+      setGitResult({ success: false, message: `Network/API error: ${err.message || err}` });
     } finally {
       setIsPushingToGit(false);
     }
@@ -846,8 +861,8 @@ export default function App() {
             onClick={() => setShowLanding(true)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-neutral-400 hover:bg-neutral-900/50 hover:text-white transition-all text-left cursor-pointer font-semibold"
           >
-            <FolderOpen size={16} className="text-amber-400" />
-            Switch Project
+            <Home size={16} className="text-amber-400" />
+            Home
           </button>
 
           <button

@@ -124,7 +124,7 @@ export const getAccessToken = async (): Promise<string | null> => {
  */
 export const getOrCreateFolder = async (accessToken: string): Promise<string> => {
   // Use the connected folder ID provided by the user
-  return '1snSArcLLQakoFybxXejVNb5kvEDDOCmY';
+  return '1p2GmNQLAgMxnoAn4dcu95YtYYFL-59p1';
 };
 
 /**
