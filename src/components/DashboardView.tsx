@@ -381,9 +381,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <h2 id="dashboard-project-name" className="text-2xl md:text-3xl font-black text-neutral-900 tracking-tight uppercase">
             {project.name}
           </h2>
-          <p className="text-xs text-neutral-600 font-bold uppercase tracking-widest mt-1">
-            Multi-Yard Overview &amp; Statistics
-          </p>
         </div>
 
         {/* Stats Grid */}
