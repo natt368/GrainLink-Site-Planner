@@ -493,7 +493,7 @@ export default function App() {
       {/* Immersive Landing Page View */}
       {showLanding ? (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-radial from-neutral-900 via-neutral-950 to-black text-zinc-100 px-6 py-12 overflow-y-auto">
-          <div className="max-w-4xl w-full flex flex-col items-center animate-fade-in">
+          <div className={`${isDevMode ? 'max-w-6xl' : 'max-w-4xl'} w-full flex flex-col items-center animate-fade-in`}>
             
             {/* Logo / Brand Accent */}
             <div className="flex items-center gap-3 mb-6">
@@ -506,7 +506,7 @@ export default function App() {
               Site Planner
             </h1>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+            <div className={`grid grid-cols-1 ${isDevMode ? 'lg:grid-cols-3' : 'md:grid-cols-2'} gap-6 w-full`}>
               
               {/* Left Box: New Site / Resume */}
               <div className="bg-neutral-950/80 border border-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between hover:border-neutral-800 transition-all shadow-xl">
@@ -696,6 +696,71 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Box 3: GitHub Deployment (Dev Mode Only) */}
+              {isDevMode && (
+                <div className="bg-neutral-950/80 border border-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between hover:border-neutral-800 transition-all shadow-xl">
+                  <div className="space-y-4">
+                    <div className="inline-flex p-3 bg-amber-400/10 text-amber-400 rounded-2xl border border-amber-400/20">
+                      <Github size={24} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-bold text-white">GitHub Sync</h2>
+                      {gitStatus?.hasChanges ? (
+                        <span className="text-[9px] bg-red-500/20 text-red-400 font-bold px-2 py-0.5 rounded-full border border-red-500/30 animate-pulse uppercase tracking-wider">
+                          Pending
+                        </span>
+                      ) : (
+                        <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 uppercase tracking-wider">
+                          Synced
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-neutral-400 leading-relaxed">
+                      Only visible in AI Studio Preview (Dev Mode). Review pending modifications and manually deploy updates directly to the git repository.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 mt-8">
+                    {/* Change list preview inside the card */}
+                    <div className="bg-neutral-950 border border-neutral-900 rounded-xl p-3 max-h-24 overflow-y-auto font-mono text-[9px] text-neutral-500 space-y-1">
+                      {gitStatus?.changes && gitStatus.changes.length > 0 ? (
+                        gitStatus.changes.map((change, i) => (
+                          <div key={i} className="flex items-center gap-2 truncate">
+                            <span className={`font-bold uppercase shrink-0 ${
+                              change.startsWith('M') ? 'text-amber-400' :
+                              change.startsWith('A') || change.includes('??') ? 'text-emerald-400' : 'text-red-400'
+                            }`}>
+                              {change.slice(0, 2)}
+                            </span>
+                            <span className="truncate">{change.slice(2)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-neutral-700 py-3 uppercase tracking-wider">
+                          All files synced
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setGitResult(null);
+                        setGitPushMessage('Sync changes from AI Studio');
+                        setShowGitModal(true);
+                      }}
+                      className={`w-full py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        gitStatus?.hasChanges
+                          ? 'bg-amber-400 hover:bg-amber-300 text-black shadow-lg shadow-amber-400/5'
+                          : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-400 border border-neutral-800'
+                      }`}
+                    >
+                      <GitBranch size={14} />
+                      {gitStatus?.hasChanges ? 'Deploy to GitHub' : 'No Changes to Deploy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </div>
 
             <div className="mt-12 text-[10px] font-semibold text-neutral-600 uppercase tracking-widest text-center">
@@ -875,42 +940,6 @@ export default function App() {
             />
           </div>
         </div>
-
-        {/* Manual GitHub Sync Section */}
-        {isDevMode && (
-          <div className="p-6 border-t border-neutral-900 bg-neutral-950/20 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase text-neutral-500 tracking-wider flex items-center gap-1">
-                <Github size={12} />
-                GitHub Deployment
-              </span>
-              {gitStatus?.hasChanges ? (
-                <span className="text-[8px] bg-red-500/20 text-red-400 font-bold px-1.5 py-0.5 rounded-full border border-red-500/30 animate-pulse">
-                  Pending Changes
-                </span>
-              ) : (
-                <span className="text-[8px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
-                  Synced
-                </span>
-              )}
-            </div>
-            <button
-              onClick={() => {
-                setGitResult(null);
-                setGitPushMessage('Sync changes from AI Studio');
-                setShowGitModal(true);
-              }}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                gitStatus?.hasChanges
-                  ? 'bg-neutral-850 hover:bg-neutral-850 text-amber-400 border border-amber-400/30 shadow-lg shadow-amber-500/5'
-                  : 'bg-neutral-900 hover:bg-neutral-850 text-neutral-400 border border-neutral-800'
-              }`}
-            >
-              <GitBranch size={13} />
-              {gitStatus?.hasChanges ? 'Deploy to GitHub' : 'Deploy to GitHub'}
-            </button>
-          </div>
-        )}
 
         {/* Global Unified PDF Report Export */}
         <div className="p-6 border-t border-neutral-900 bg-neutral-950">
