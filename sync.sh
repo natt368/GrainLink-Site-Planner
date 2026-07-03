@@ -15,8 +15,12 @@ fi
 
 # Commit changes
 if git commit -m "$MESSAGE"; then
+  # Pull remote changes with rebase first to prevent non-fast-forward conflicts
+  git pull --rebase origin main
   # Push to GitHub
   git push origin main
 else
-  echo "No changes to commit."
+  echo "No local changes to commit. Checking if we need to sync remote changes..."
+  git pull --rebase origin main
+  git push origin main
 fi
