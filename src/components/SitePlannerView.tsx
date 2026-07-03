@@ -17,7 +17,7 @@ interface SitePlannerViewProps {
   onSelectAsset: (assetId: number | null) => void;
 }
 
-const GRID_SIZE = 10;
+const GRID_SIZE = 5;
 const VISUAL_GRID_MAJOR = 50;
 const BASE_SCALE = 3.0;
 const BIN_SIZES = [18, 24, 30, 36, 42, 48, 50];
@@ -115,11 +115,45 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           e.preventDefault();
         }
       }
+
+      // Arrow key movement for selected asset
+      if (selectedAssetId !== null && selectedAsset) {
+        let dx = 0;
+        let dy = 0;
+        if (e.key === 'ArrowUp') {
+          dy = -GRID_SIZE;
+        } else if (e.key === 'ArrowDown') {
+          dy = GRID_SIZE;
+        } else if (e.key === 'ArrowLeft') {
+          dx = -GRID_SIZE;
+        } else if (e.key === 'ArrowRight') {
+          dx = GRID_SIZE;
+        }
+
+        if (dx !== 0 || dy !== 0) {
+          e.preventDefault();
+          onUpdateProject((prev) => ({
+            ...prev,
+            yards: prev.yards.map((y) =>
+              y.id === prev.activeYardId
+                ? {
+                    ...y,
+                    bins: y.bins.map((b) =>
+                      b.id === selectedAssetId
+                        ? { ...b, x: b.x + dx, y: b.y + dy }
+                        : b
+                    ),
+                  }
+                : y
+            ),
+          }));
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedAssetId, activeYard]);
+  }, [selectedAssetId, selectedAsset, activeYard, onUpdateProject]);
 
   // Canvas Drawing loop
   useEffect(() => {
@@ -998,7 +1032,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
             Reset View
           </button>
           <div className="text-[10px] font-bold uppercase tracking-widest text-neutral-600 bg-neutral-950/85 backdrop-blur-md px-3 py-2 rounded-lg border border-neutral-900">
-            Snap-to-Grid: 10px
+            Snap-to-Grid: {GRID_SIZE}px
           </div>
         </div>
       </div>
