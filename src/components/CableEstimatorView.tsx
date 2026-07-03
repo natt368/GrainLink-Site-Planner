@@ -994,7 +994,7 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
               {/* Bin Layout Layer */}
               <g id="bin-layer">
                 {/* Foundation */}
-                <rect id="foundation" x={wl - 30} y={gy} width={wp + 60} height="15" className="foundation-stroke stroke-zinc-800 fill-[#18181b]" />
+                <rect id="foundation" x={wl - 30} y={gy} width={wp + 60} height="15" className="foundation-stroke stroke-zinc-700 fill-[#a1a1aa]" />
 
                 {/* Aeration ticks */}
                 <g id="tick-layer">
