@@ -507,8 +507,14 @@ export default function App() {
     <div className="flex h-screen w-full select-none overflow-hidden bg-black text-zinc-100 font-sans">
       {/* Immersive Landing Page View */}
       {showLanding ? (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-radial from-neutral-900 via-neutral-950 to-black text-zinc-100 px-6 py-12 overflow-y-auto">
-          <div className={`${isDevMode ? 'max-w-6xl' : 'max-w-4xl'} w-full flex flex-col items-center animate-fade-in`}>
+        <div 
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center text-zinc-100 px-6 py-12 overflow-y-auto bg-cover bg-center"
+          style={{ backgroundImage: `url('https://raw.githubusercontent.com/natt368/GrainLink-Site-Planner/main/IMG_0538.jpeg')` }}
+        >
+          {/* Backdrop Blur & Elegant Dark Vignette Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-neutral-950/85 to-neutral-900/40 z-0 backdrop-blur-[1px]" />
+          
+          <div className={`${isDevMode ? 'max-w-6xl' : 'max-w-4xl'} w-full flex flex-col items-center animate-fade-in relative z-10`}>
             
             {/* Logo / Brand Accent */}
             <div className="flex items-center gap-3 mb-6">
