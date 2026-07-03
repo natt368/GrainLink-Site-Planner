@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { Project, Yard, Asset, BinAsset, MarkerAsset, ZoneAsset } from '../types';
 import { getCableRecommendation } from '../utils/pdfGenerator';
 import { Trash2, Copy, Compass, Plus, Settings, RefreshCw, ZoomIn, Info, MapPin } from 'lucide-react';
@@ -89,71 +89,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     };
   };
 
-  // Setup Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if focus is in text inputs or textarea
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT'
-      ) {
-        return;
-      }
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedAssetId !== null) {
-          handleDeleteAsset();
-          e.preventDefault();
-        }
-      }
-
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
-        if (selectedAssetId !== null) {
-          handleDuplicateAsset();
-          e.preventDefault();
-        }
-      }
-
-      // Arrow key movement for selected asset
-      if (selectedAssetId !== null && selectedAsset) {
-        let dx = 0;
-        let dy = 0;
-        if (e.key === 'ArrowUp') {
-          dy = -GRID_SIZE;
-        } else if (e.key === 'ArrowDown') {
-          dy = GRID_SIZE;
-        } else if (e.key === 'ArrowLeft') {
-          dx = -GRID_SIZE;
-        } else if (e.key === 'ArrowRight') {
-          dx = GRID_SIZE;
-        }
-
-        if (dx !== 0 || dy !== 0) {
-          e.preventDefault();
-          onUpdateProject((prev) => ({
-            ...prev,
-            yards: prev.yards.map((y) =>
-              y.id === prev.activeYardId
-                ? {
-                    ...y,
-                    bins: y.bins.map((b) =>
-                      b.id === selectedAssetId
-                        ? { ...b, x: b.x + dx, y: b.y + dy }
-                        : b
-                    ),
-                  }
-                : y
-            ),
-          }));
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedAssetId, selectedAsset, activeYard, onUpdateProject]);
+  // Keyboard Shortcuts defined below after event handlers
 
   // Canvas Drawing loop
   useEffect(() => {
@@ -404,7 +340,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     onSelectAsset(newZone.id);
   };
 
-  const handleDeleteAsset = () => {
+  const handleDeleteAsset = useCallback(() => {
     if (selectedAssetId === null) return;
     onUpdateProject((prev) => ({
       ...prev,
@@ -415,9 +351,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       ),
     }));
     onSelectAsset(null);
-  };
+  }, [selectedAssetId, onUpdateProject, onSelectAsset]);
 
-  const handleDuplicateAsset = () => {
+  const handleDuplicateAsset = useCallback(() => {
     if (selectedAssetId === null || !selectedAsset) return;
 
     let binCountInYard = 1;
@@ -490,7 +426,73 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       ),
     }));
     onSelectAsset(copy.id);
-  };
+  }, [selectedAssetId, selectedAsset, project, activeYard, onUpdateProject, onSelectAsset]);
+
+  // Setup Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if focus is in text inputs or textarea
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      ) {
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedAssetId !== null) {
+          handleDeleteAsset();
+          e.preventDefault();
+        }
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+        if (selectedAssetId !== null) {
+          handleDuplicateAsset();
+          e.preventDefault();
+        }
+      }
+
+      // Arrow key movement for selected asset
+      if (selectedAssetId !== null && selectedAsset) {
+        let dx = 0;
+        let dy = 0;
+        if (e.key === 'ArrowUp') {
+          dy = -GRID_SIZE;
+        } else if (e.key === 'ArrowDown') {
+          dy = GRID_SIZE;
+        } else if (e.key === 'ArrowLeft') {
+          dx = -GRID_SIZE;
+        } else if (e.key === 'ArrowRight') {
+          dx = GRID_SIZE;
+        }
+
+        if (dx !== 0 || dy !== 0) {
+          e.preventDefault();
+          onUpdateProject((prev) => ({
+            ...prev,
+            yards: prev.yards.map((y) =>
+              y.id === prev.activeYardId
+                ? {
+                    ...y,
+                    bins: y.bins.map((b) =>
+                      b.id === selectedAssetId
+                        ? { ...b, x: b.x + dx, y: b.y + dy }
+                        : b
+                    ),
+                  }
+                : y
+            ),
+          }));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedAssetId, selectedAsset, onUpdateProject, handleDeleteAsset, handleDuplicateAsset]);
 
   const handleUpdateAssetProperty = (key: string, value: any) => {
     onUpdateProject((prev) => ({

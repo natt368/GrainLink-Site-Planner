@@ -324,6 +324,63 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
     }));
   };
 
+  // Setup Keyboard Shortcuts for Side Planner (Measure Tool abort, delete last line)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if focus is in text inputs or textarea
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      ) {
+        return;
+      }
+
+      if (!activeBin) return;
+
+      const measurements = activeBin.measurements || [];
+      const lastLine = measurements[measurements.length - 1];
+
+      // 1. Escape key cancels the active drawing line if it is in progress (i.e. has p1 but not p2)
+      if (e.key === 'Escape') {
+        if (lastLine && !lastLine.p2) {
+          e.preventDefault();
+          const newMeasurements = measurements.slice(0, -1);
+          onUpdateProject((prev) => ({
+            ...prev,
+            yards: prev.yards.map((y) => ({
+              ...y,
+              bins: y.bins.map((b) => (b.id === activeBinId ? { ...b, measurements: newMeasurements } : b)),
+            })),
+          }));
+          setHoverCoords(null);
+          calculateCablesFromMeasurements(newMeasurements);
+        }
+      }
+
+      // 2. Delete or Backspace key deletes the last line (complete or incomplete)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (measurements.length > 0) {
+          e.preventDefault();
+          const newMeasurements = measurements.slice(0, -1);
+          onUpdateProject((prev) => ({
+            ...prev,
+            yards: prev.yards.map((y) => ({
+              ...y,
+              bins: y.bins.map((b) => (b.id === activeBinId ? { ...b, measurements: newMeasurements } : b)),
+            })),
+          }));
+          setHoverCoords(null);
+          calculateCablesFromMeasurements(newMeasurements);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeBin, activeBinId, onUpdateProject]);
+
   // SVG interactions
   const handleSVGMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button === 1 || (e.button === 0 && e.shiftKey) || e.button === 2) {
