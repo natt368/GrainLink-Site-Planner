@@ -5,8 +5,16 @@
 
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import html2canvas from 'html2canvas';
 import { Project, BinAsset, Asset } from '../types';
+
+export interface PDFGeneratorCallbacks {
+  setLoading: (loading: boolean) => void;
+  setLoadingText: (text: string) => void;
+}
+
+export interface PDFGeneratorOptions {
+  includeAssetDirectory?: boolean;
+}
 
 export function getCableRecommendation(diameterStr: string) {
   const d = parseFloat(diameterStr) || 0;
@@ -21,14 +29,277 @@ export function getCableRecommendation(diameterStr: string) {
   }
 }
 
-interface PDFGeneratorCallbacks {
-  setLoading: (loading: boolean) => void;
-  setLoadingText: (text: string) => void;
+/**
+ * Draws a highly precise, crisp, vector-based 2D Side Plan (cross-section)
+ * of a grain storage bin directly onto a jsPDF page.
+ */
+export function drawBinSidePlan(
+  doc: jsPDF,
+  bin: BinAsset,
+  targetX: number,
+  targetY: number,
+  targetW: number,
+  targetH: number,
+  theme: 'light' | 'dark' = 'light'
+) {
+  const D = parseFloat(bin.diameter || '36') || 36;
+  const H = parseFloat(bin.totalHeight || '42') || 42;
+  const E = parseFloat(bin.eaveHeight || '32') || 32;
+  const F = parseFloat(bin.floorThick || '1.5') || 1.5;
+
+  const pixelsPerFoot = 400 / Math.max(H, D);
+  const cx = 300;
+  const gy = 520;
+  const wp = D * pixelsPerFoot;
+  const hp = E * pixelsPerFoot;
+  const tp = H * pixelsPerFoot;
+  const fp = F * pixelsPerFoot;
+  const wl = cx - wp / 2;
+  const wr = cx + wp / 2;
+  const ey = gy - hp;
+  const py = gy - tp;
+  const lw = Math.max(20, wp * 0.1);
+
+  const scaleX = targetW / 600;
+  const scaleY = targetH / 800;
+
+  const mapX = (x: number) => targetX + x * scaleX;
+  const mapY = (y: number) => targetY + y * scaleY;
+
+  // Draw background border / panel
+  if (theme === 'dark') {
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(targetX, targetY, targetW, targetH, 'F');
+  } else {
+    // Elegant blueprint outline border
+    doc.setFillColor(253, 253, 253);
+    doc.rect(targetX, targetY, targetW, targetH, 'F');
+    doc.setDrawColor(230, 230, 235);
+    doc.setLineWidth(1);
+    doc.rect(targetX, targetY, targetW, targetH, 'S');
+  }
+
+  // Draw Grid Dots for schematic look
+  doc.setDrawColor(theme === 'dark' ? 50 : 235, theme === 'dark' ? 65 : 235, theme === 'dark' ? 85 : 235);
+  for (let gxCoords = 25; gxCoords < 580; gxCoords += 30) {
+    for (let gyCoords = 25; gyCoords < 780; gyCoords += 30) {
+      doc.circle(mapX(gxCoords), mapY(gyCoords), 0.5, 'F');
+    }
+  }
+
+  // 1. Foundation Block
+  doc.setFillColor(theme === 'dark' ? 30 : 243, theme === 'dark' ? 41 : 244, theme === 'dark' ? 59 : 246);
+  doc.setDrawColor(theme === 'dark' ? 71 : 180, theme === 'dark' ? 85 : 180, theme === 'dark' ? 105 : 180);
+  doc.setLineWidth(1);
+  doc.rect(mapX(wl - 30), mapY(gy), (wp + 60) * scaleX, 15 * scaleY, 'FD');
+
+  // 2. Foundation text label
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(theme === 'dark' ? 148 : 130, theme === 'dark' ? 163 : 130, theme === 'dark' ? 184 : 130);
+  doc.text('CONCRETE FOUNDATION BLOCK', mapX(cx), mapY(gy + 10), { align: 'center' });
+
+  // 3. Aeration Floor (Dashed Line)
+  doc.setDrawColor(theme === 'dark' ? 120 : 150);
+  doc.setLineWidth(1);
+  (doc as any).setLineDash([3, 3]);
+  doc.line(mapX(wl), mapY(gy - fp), mapX(wr), mapY(gy - fp));
+  (doc as any).setLineDash([]);
+
+  // 4. Auger Sweep Buffer (Light red warning safety zone)
+  const bufferHeight = (10 / 12) * pixelsPerFoot;
+  doc.setFillColor(239, 68, 68, theme === 'dark' ? 0.06 : 0.04);
+  doc.setDrawColor(239, 68, 68);
+  doc.setLineWidth(0.5);
+  (doc as any).setLineDash([2, 2]);
+  doc.rect(mapX(wl), mapY(gy - fp - bufferHeight), wp * scaleX, bufferHeight * scaleY, 'FD');
+  (doc as any).setLineDash([]);
+
+  // 5. Core Bin Shell Outline
+  doc.setDrawColor(217, 119, 6); // amber-600 (GrainLink Brand Color)
+  doc.setLineWidth(1.8);
+  doc.line(mapX(wl), mapY(gy), mapX(wl), mapY(ey));
+  doc.line(mapX(wl), mapY(ey), mapX(cx - lw / 2), mapY(py));
+  doc.line(mapX(cx - lw / 2), mapY(py), mapX(cx + lw / 2), mapY(py));
+  doc.line(mapX(cx + lw / 2), mapY(py), mapX(wr), mapY(ey));
+  doc.line(mapX(wr), mapY(ey), mapX(wr), mapY(gy));
+  doc.line(mapX(wr), mapY(gy), mapX(wl), mapY(gy));
+
+  // Peak Lid cap
+  doc.rect(mapX(cx - lw / 2 - 2), mapY(py - 4), (lw + 4) * scaleX, 8 * scaleY, 'S');
+
+  // 6. Eave Dashed Line
+  doc.setDrawColor(217, 119, 6);
+  doc.setLineWidth(0.5);
+  (doc as any).setLineDash([4, 4]);
+  doc.line(mapX(wl), mapY(ey), mapX(wr), mapY(ey));
+  (doc as any).setLineDash([]);
+
+  // 7. Mid-Roof Marker Reference
+  const midRoofY = (ey + py) / 2;
+  const roofSlope = (ey - py) / Math.max(1, wp / 2 - lw / 2);
+  const midRoofOffset = (ey - midRoofY) / Math.max(0.1, roofSlope);
+  const mxLeft = wl + midRoofOffset;
+  const mxRight = wr - midRoofOffset;
+  doc.setDrawColor(16, 185, 129); // emerald-500
+  doc.setLineWidth(0.5);
+  (doc as any).setLineDash([3, 3]);
+  doc.line(mapX(mxLeft), mapY(midRoofY), mapX(mxRight), mapY(midRoofY));
+  (doc as any).setLineDash([]);
+
+  doc.setTextColor(16, 185, 129);
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(5);
+  doc.text('MID-ROOF REFERENCE LINE', mapX(cx), mapY(midRoofY - 3), { align: 'center' });
+
+  // 8. Draw Cables (either custom measurements or standard recommendation)
+  const measurements = bin.measurements || [];
+  if (measurements.length > 0) {
+    // Draw user-defined custom cables
+    measurements.forEach((line) => {
+      if (!line.p1 || !line.p2) return;
+      const x1 = mapX(line.p1.x);
+      const y1 = mapY(line.p1.y);
+      const x2 = mapX(line.p2.x);
+      const y2 = mapY(line.p2.y);
+
+      const dx = line.p2.x - line.p1.x;
+      const dy = line.p2.y - line.p1.y;
+      const distFt = (Math.sqrt(dx * dx + dy * dy) / pixelsPerFoot).toFixed(1);
+
+      const midLineX = (line.p1.x + line.p2.x) / 2;
+      const isCenterCable = Math.abs(midLineX - cx) <= wp * 0.16;
+
+      const cableColor = isCenterCable ? [217, 119, 6] : [6, 182, 212]; // amber vs cyan
+      doc.setDrawColor(cableColor[0], cableColor[1], cableColor[2]);
+      doc.setLineWidth(1.5);
+      (doc as any).setLineDash([4, 3]);
+      doc.line(x1, y1, x2, y2);
+      (doc as any).setLineDash([]);
+
+      // Terminal weight anchor
+      doc.setFillColor(cableColor[0], cableColor[1], cableColor[2]);
+      doc.circle(x2, y2, 2.5, 'F');
+      doc.circle(x1, y1, 2, 'F');
+
+      // Label floating text
+      doc.setTextColor(cableColor[0], cableColor[1], cableColor[2]);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.text(`${distFt}'`, (x1 + x2) / 2 + 6, (y1 + y2) / 2 - 2);
+    });
+  } else {
+    // Draw standard recommended cables
+    const rec = getCableRecommendation(bin.diameter);
+    const cablesTermY = gy - fp - 2 * pixelsPerFoot; // terminate 2' above floor
+
+    // Center cable
+    if (rec.center > 0) {
+      const cx1 = mapX(cx);
+      const cy1 = mapY(py + 4);
+      const cx2 = mapX(cx);
+      const cy2 = mapY(cablesTermY);
+
+      doc.setDrawColor(217, 119, 6); // amber
+      doc.setLineWidth(1.5);
+      (doc as any).setLineDash([4, 3]);
+      doc.line(cx1, cy1, cx2, cy2);
+      (doc as any).setLineDash([]);
+
+      doc.setFillColor(217, 119, 6);
+      doc.circle(cx2, cy2, 2.5, 'F');
+      doc.circle(cx1, cy1, 2, 'F');
+
+      // Label
+      const centerLength = Math.max(2, Math.round(H - F - 2));
+      doc.setTextColor(217, 119, 6);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.text(`${centerLength}' (Center Cable)`, cx1 + 6, (cy1 + cy2) / 2);
+    }
+
+    // Radius cables
+    if (rec.radius > 0) {
+      const radDistance = wp * 0.35;
+      const rxL = cx - radDistance;
+      const rxR = cx + radDistance;
+
+      const rxL_Y = ey + ((rxL - wl) / Math.max(1, cx - lw / 2 - wl)) * (py - ey);
+      const rxR_Y = py + ((rxR - (cx + lw / 2)) / Math.max(1, wr - (cx + lw / 2))) * (ey - py);
+
+      const rPoints = [
+        { x1: mapX(rxL), y1: mapY(rxL_Y), x2: mapX(rxL), y2: mapY(cablesTermY) },
+        { x1: mapX(rxR), y1: mapY(rxR_Y), x2: mapX(rxR), y2: mapY(cablesTermY) }
+      ];
+
+      rPoints.forEach((pt, rIdx) => {
+        doc.setDrawColor(6, 182, 212); // cyan
+        doc.setLineWidth(1.5);
+        (doc as any).setLineDash([4, 3]);
+        doc.line(pt.x1, pt.y1, pt.x2, pt.y2);
+        (doc as any).setLineDash([]);
+
+        doc.setFillColor(6, 182, 212);
+        doc.circle(pt.x2, pt.y2, 2.5, 'F');
+        doc.circle(pt.x1, pt.y1, 2, 'F');
+
+        const radLength = Math.max(2, Math.round((gy - rxL_Y) / pixelsPerFoot - F - 2));
+        if (rIdx === 0) {
+          doc.setTextColor(6, 182, 212);
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.text(`${radLength}' (Radius Cable)`, pt.x1 - 6, (pt.y1 + pt.y2) / 2, { align: 'right' });
+        }
+      });
+    }
+  }
+
+  // 9. Dimensioning Arrows & Labels
+  doc.setDrawColor(115, 115, 115);
+  doc.setLineWidth(0.5);
+  doc.setTextColor(115, 115, 115);
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(7);
+
+  // Diameter dimension line
+  const dDimY = gy + 30;
+  doc.line(mapX(wl), mapY(dDimY), mapX(wr), mapY(dDimY));
+  doc.line(mapX(wl), mapY(dDimY), mapX(wl + 5), mapY(dDimY - 2));
+  doc.line(mapX(wl), mapY(dDimY), mapX(wl + 5), mapY(dDimY + 2));
+  doc.line(mapX(wr), mapY(dDimY), mapX(wr - 5), mapY(dDimY - 2));
+  doc.line(mapX(wr), mapY(dDimY), mapX(wr - 5), mapY(dDimY + 2));
+  doc.text(`DIAMETER: ${D} FT`, mapX(cx), mapY(dDimY + 10), { align: 'center' });
+
+  // Eave Height dimension line
+  const eDimX = wr + 30;
+  doc.line(mapX(eDimX), mapY(gy), mapX(eDimX), mapY(ey));
+  doc.line(mapX(eDimX), mapY(gy), mapX(eDimX - 2), mapY(gy - 5));
+  doc.line(mapX(eDimX), mapY(gy), mapX(eDimX + 2), mapY(gy - 5));
+  doc.line(mapX(eDimX), mapY(ey), mapX(eDimX - 2), mapY(ey + 5));
+  doc.line(mapX(eDimX), mapY(ey), mapX(eDimX + 2), mapY(ey + 5));
+  doc.text(`EAVE: ${E} FT`, mapX(eDimX + 5), mapY((gy + ey) / 2 + 3));
+
+  // Total Height dimension line
+  const tDimX = wl - 30;
+  doc.line(mapX(tDimX), mapY(gy), mapX(tDimX), mapY(py));
+  doc.line(mapX(tDimX), mapY(gy), mapX(tDimX - 2), mapY(gy - 5));
+  doc.line(mapX(tDimX), mapY(gy), mapX(tDimX + 2), mapY(gy - 5));
+  doc.line(mapX(tDimX), mapY(py), mapX(tDimX - 2), mapY(py + 5));
+  doc.line(mapX(tDimX), mapY(py), mapX(tDimX + 2), mapY(py + 5));
+  doc.text(`TOTAL: ${H} FT`, mapX(tDimX - 5), mapY((gy + py) / 2 + 3), { align: 'right' });
 }
 
+/**
+ * Main entrance to build a comprehensive landscape PDF report containing:
+ * - Stunning blueprint-integrated cover page
+ * - 2D Site Layout maps
+ * - Technical directory databases
+ * - Vector blueprints for each storage asset
+ */
 export async function generateUnifiedPDF(
   project: Project,
-  callbacks: PDFGeneratorCallbacks
+  callbacks: PDFGeneratorCallbacks,
+  options?: PDFGeneratorOptions
 ) {
   const { setLoading, setLoadingText } = callbacks;
   setLoading(true);
@@ -42,6 +313,8 @@ export async function generateUnifiedPDF(
     const title = project.name || 'Grain Site Layout';
     const customerName = project.customer.name || 'Unnamed Customer';
     const customerPhone = project.customer.phone || 'No Phone';
+    const customerEmail = project.customer.email || 'No Email';
+    const customerLocation = project.customer.location || 'No Location Provided';
     const date = project.date || new Date().toLocaleDateString();
 
     const totalYards = project.yards.length;
@@ -49,6 +322,9 @@ export async function generateUnifiedPDF(
     let totalZones = 0;
     let totalCap = 0;
     let totalCables = 0;
+
+    let totalChesterX = 0;
+    let totalChesterX1 = 0;
 
     project.yards.forEach((y) => {
       y.bins.forEach((b) => {
@@ -65,93 +341,131 @@ export async function generateUnifiedPDF(
           totalCables += rec.center + rec.radius;
         } else if (b.type === 'zone') {
           totalZones++;
+        } else if (b.type === 'chester-x') {
+          totalChesterX++;
+        } else if (b.type === 'chester-x1') {
+          totalChesterX1++;
         }
       });
     });
 
-    const totalSheets = 1 + totalYards * 2 + totalBins;
+    const totalSheets = 1 + totalYards * (options?.includeAssetDirectory ? 2 : 1);
 
+    // ==========================================
     // PAGE 1: PROJECT COVER
+    // ==========================================
     setLoadingText('Writing Sheet 1: Cover & Summary...');
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pw, ph, 'F');
 
+    // Title Block
     doc.setTextColor(217, 119, 6); // Orange-amber
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(26);
-    doc.text('GRAINLINK MULTI-YARD SITE REPORT', 50, 60);
+    doc.setFontSize(24);
+    doc.text('GRAINLINK SITE PLAN', 50, 60);
 
-    doc.setFontSize(9);
+    doc.setFontSize(9.5);
     doc.setTextColor(110, 110, 110);
-    doc.text(`PROJECT NAME: ${title.toUpperCase()}`, 50, 85);
-    doc.text(`CUSTOMER: ${customerName.toUpperCase()}`, 50, 97);
-    doc.text(`PHONE: ${customerPhone}`, 50, 109);
-    doc.text(`GENERATED DATE: ${date}`, 50, 121);
+    doc.text(`SHEET 1 OF ${totalSheets} (PROJECT COVER)`, pw - 50, 60, { align: 'right' });
 
-    doc.text(`SHEET 1 OF ${totalSheets}`, pw - 120, 60);
+    // Horizontal Accent Line
+    doc.setDrawColor(217, 119, 6);
+    doc.setLineWidth(1.5);
+    doc.line(50, 85, pw - 50, 85);
 
-    // Render Stats boxes
-    doc.setFillColor(245, 245, 247);
-    doc.rect(50, 140, 160, 60, 'F');
-    doc.rect(230, 140, 160, 60, 'F');
-    doc.rect(410, 140, 160, 60, 'F');
-    doc.rect(590, 140, 160, 60, 'F');
-
-    doc.setTextColor(100, 100, 100);
+    // Left Column: Customer Dossier
     doc.setFontSize(8);
-    doc.text('TOTAL PLANNED YARDS', 60, 158);
-    doc.text('COMBINED STORAGE', 240, 158);
-    doc.text('TOTAL ASSETS REGISTERED', 420, 158);
-    doc.text('ESTIMATED CABLES NEEDED', 600, 158);
+    doc.setTextColor(110, 110, 110);
+    doc.setFont('Helvetica', 'bold');
+    doc.text('CUSTOMER INFORMATION', 50, 115);
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(16);
-    doc.text(`${totalYards}`, 60, 185);
-    doc.text(`${totalCap.toLocaleString()} BU`, 240, 185);
-    doc.text(`${totalBins + totalZones} Units`, 420, 185);
-    doc.text(`${totalCables} Cables`, 600, 185);
+    doc.setDrawColor(230, 230, 235);
+    doc.setLineWidth(0.5);
+    doc.line(50, 120, 460, 120);
 
-    doc.setFontSize(12);
-    doc.setTextColor(217, 119, 6);
-    doc.text('YARDS REGISTER SUMMARY', 50, 240);
+    const dossierY = 135;
+    doc.setFontSize(9.5);
+    doc.setTextColor(50, 50, 50);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Project Name:', 50, dossierY);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(title.toUpperCase(), 130, dossierY);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Customer Name:', 50, dossierY + 16);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(customerName, 130, dossierY + 16);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Contact Phone:', 50, dossierY + 32);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(customerPhone, 130, dossierY + 32);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Contact Email:', 50, dossierY + 48);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(customerEmail, 130, dossierY + 48);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Yard Location:', 50, dossierY + 64);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(customerLocation, 130, dossierY + 64);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Generated Date:', 50, dossierY + 80);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(date, 130, dossierY + 80);
+
+    // Left Column: Statistics Block
+    doc.setFontSize(8);
+    doc.setTextColor(110, 110, 110);
+    doc.setFont('Helvetica', 'bold');
+    doc.text('PROJECT METRICS & YARD STATISTICS', 50, 245);
+    doc.line(50, 250, 460, 250);
+
+    const drawMetricCard = (mx: number, my: number, mw: number, mh: number, label: string, val: string) => {
+      doc.setFillColor(248, 248, 250);
+      doc.rect(mx, my, mw, mh, 'F');
+      doc.setDrawColor(225, 225, 228);
+      doc.rect(mx, my, mw, mh, 'S');
+
+      doc.setTextColor(110, 110, 110);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.text(label, mx + 10, my + 14);
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(val, mx + 10, my + 30);
+    };
+
+    drawMetricCard(50, 260, 126, 40, 'TOTAL PLANNED YARDS', `${totalYards}`);
+    drawMetricCard(191, 260, 126, 40, 'CHESTER-X PLACED', `${totalChesterX}`);
+    drawMetricCard(332, 260, 128, 40, 'CHESTER-X1 PLACED', `${totalChesterX1}`);
+
+    // Left Column: Yards Directory
+    doc.setFontSize(8);
+    doc.setTextColor(110, 110, 110);
+    doc.setFont('Helvetica', 'bold');
+    doc.text('YARDS DIRECTORY REGISTER', 50, 365);
+    doc.line(50, 370, 460, 370);
 
     const dirTableRows = project.yards.map((y) => {
       const yardBins = y.bins.filter((b) => b.type === 'bin') as BinAsset[];
-      let yardCap = 0;
-      let yardCables = 0;
-
-      yardBins.forEach((b) => {
-        const D = parseFloat(b.diameter) || 0;
-        const H = parseFloat(b.totalHeight) || 0;
-        const E = parseFloat(b.eaveHeight) || 0;
-        const F = parseFloat(b.floorThick) || 0;
-        yardCap += Math.round(
-          Math.PI * Math.pow(D / 2, 2) * (Math.max(0, E - F) + (H - E) / 3) * 0.80356
-        );
-        const rec = getCableRecommendation(b.diameter);
-        yardCables += rec.center + rec.radius;
-      });
-
       return [
         y.name,
-        `${yardBins.length} Bins`,
-        `${y.bins.filter((b) => b.type === 'zone').length} Zones`,
-        `${y.bins.filter((b) => b.type !== 'bin' && b.type !== 'zone').length} Markers`,
-        `${yardCap.toLocaleString()} BU`,
-        `${yardCables} Cables`,
+        `${yardBins.length}`,
       ];
     });
 
     autoTable(doc, {
-      startY: 255,
+      startY: 380,
       head: [
         [
-          'Yard Location',
+          'Yard Location Name',
           'Bin Count',
-          'Zone Boxes',
-          'Special Markers',
-          'Storage Capacity',
-          'Cables Required',
         ],
       ],
       body: dirTableRows,
@@ -159,18 +473,112 @@ export async function generateUnifiedPDF(
       styles: {
         fillColor: [255, 255, 255],
         textColor: [40, 40, 40],
-        fontSize: 8.5,
-        cellPadding: 7,
-        lineColor: [220, 220, 220],
+        fontSize: 8,
+        cellPadding: 6,
+        lineColor: [225, 225, 228],
       },
-      headStyles: { fillColor: [251, 191, 36], textColor: [0, 0, 0], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 248, 248] },
-      margin: { left: 50, right: 50 },
+      headStyles: { fillColor: [217, 119, 6], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [250, 250, 252] },
+      margin: { left: 50, right: pw - 460 },
     });
+
+    // Right Column: Recommended Cable Arrangement Card
+    doc.setFillColor(248, 248, 250);
+    doc.rect(485, 115, 307, 425, 'F');
+    doc.setDrawColor(220, 220, 225);
+    doc.setLineWidth(1);
+    doc.rect(485, 115, 307, 425, 'S');
+
+    // Header inside the card
+    doc.setFillColor(217, 119, 6); // amber-600
+    doc.rect(485, 115, 307, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('RECOMMENDED CABLE ARRANGEMENT', 485 + 15, 115 + 19);
+
+    // Divider lines
+    doc.setDrawColor(220, 220, 225);
+    doc.setLineWidth(1);
+    doc.line(485 + 153.5, 145, 485 + 153.5, 540); // Vertical divider
+    doc.line(485, 145 + 197.5, 792, 145 + 197.5); // Horizontal divider
+
+    const drawArrangementCell = (
+      cx: number,
+      cy: number,
+      cellTitle: string,
+      description: string,
+      patternType: 'center' | 'radius3' | 'center-radius3' | 'center-radius4'
+    ) => {
+      // Title
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.text(cellTitle, cx, cy - 65, { align: 'center' });
+
+      // Bin circle outline
+      doc.setFillColor(252, 252, 253);
+      doc.setDrawColor(217, 119, 6); // amber-600
+      doc.setLineWidth(1.5);
+      doc.circle(cx, cy - 15, 30, 'FD');
+
+      // Cable markers
+      doc.setFillColor(217, 119, 6); // amber
+      doc.setDrawColor(217, 119, 6);
+      doc.setLineWidth(0.8);
+
+      if (patternType === 'center') {
+        doc.circle(cx, cy - 15, 4, 'F');
+      } else if (patternType === 'radius3') {
+        const r = 18;
+        for (let i = 0; i < 3; i++) {
+          const angle = (i * 2 * Math.PI) / 3 - Math.PI / 2;
+          const px = cx + r * Math.cos(angle);
+          const py = (cy - 15) + r * Math.sin(angle);
+          doc.line(cx, cy - 15, px, py);
+          doc.circle(px, py, 3.5, 'F');
+        }
+      } else if (patternType === 'center-radius3') {
+        doc.circle(cx, cy - 15, 4.5, 'F'); // Center cable
+        const r = 18;
+        for (let i = 0; i < 3; i++) {
+          const angle = (i * 2 * Math.PI) / 3 - Math.PI / 2;
+          const px = cx + r * Math.cos(angle);
+          const py = (cy - 15) + r * Math.sin(angle);
+          doc.line(cx, cy - 15, px, py);
+          doc.circle(px, py, 3.5, 'F');
+        }
+      } else if (patternType === 'center-radius4') {
+        doc.circle(cx, cy - 15, 4.5, 'F'); // Center cable
+        const r = 18;
+        for (let i = 0; i < 4; i++) {
+          const angle = (i * 2 * Math.PI) / 4;
+          const px = cx + r * Math.cos(angle);
+          const py = (cy - 15) + r * Math.sin(angle);
+          doc.line(cx, cy - 15, px, py);
+          doc.circle(px, py, 3.5, 'F');
+        }
+      }
+
+      // Description text
+      doc.setTextColor(217, 119, 6);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.text(description, cx, cy + 32, { align: 'center' });
+    };
+
+    // Render cells in 2x2 grid
+    drawArrangementCell(561.75, 235, 'LESS THAN 24 FT', '1 Center Cable', 'center');
+    drawArrangementCell(715.25, 235, '24 FT TO 35 FT', '3 Radius Cables', 'radius3');
+    drawArrangementCell(561.75, 430, '36 FT TO 41 FT', '1 Center + 3 Radius', 'center-radius3');
+    drawArrangementCell(715.25, 430, '42 FT TO 47 FT+', '1 Center + 4 Radius', 'center-radius4');
 
     let currentSheetIdx = 1;
     const BASE_SCALE = 3.0;
 
+    // ==========================================
+    // LOOP THROUGH SITES/YARDS
+    // ==========================================
     for (let yIdx = 0; yIdx < project.yards.length; yIdx++) {
       const yard = project.yards[yIdx];
 
@@ -194,11 +602,11 @@ export async function generateUnifiedPDF(
         50,
         80
       );
-      doc.text(`SHEET: ${currentSheetIdx} OF ${totalSheets} (LAYOUT MAP)`, pw - 180, 60);
+      doc.text(`SHEET: ${currentSheetIdx} OF ${totalSheets} (LAYOUT MAP)`, pw - 130, 60, { align: 'right' });
 
       // Draw North compass icon
-      const cX = pw - 80;
-      const cY = 75;
+      const cX = pw - 60;
+      const cY = 65;
       doc.setLineWidth(1.5);
       doc.setDrawColor(80, 80, 80);
       doc.circle(cX, cY, 15, 'S');
@@ -213,7 +621,7 @@ export async function generateUnifiedPDF(
       const lgY = ph - 55;
       doc.setLineWidth(1);
       doc.setDrawColor(210, 210, 210);
-      doc.setFillColor(252, 252, 252);
+      doc.setFillColor(252, 252, 253);
       doc.rect(lgX, lgY, 345, 35, 'FD');
 
       doc.setLineWidth(1.5);
@@ -221,6 +629,7 @@ export async function generateUnifiedPDF(
       doc.line(lgX + 10, lgY + 10, lgX + 20, lgY + 25);
       doc.line(lgX + 20, lgY + 10, lgX + 10, lgY + 25);
       doc.setTextColor(50, 50, 50);
+      doc.setFont('Helvetica', 'bold');
       doc.text('Chester-X', lgX + 25, lgY + 20);
 
       doc.setDrawColor(37, 99, 235);
@@ -262,9 +671,9 @@ export async function generateUnifiedPDF(
 
         // Grid dots background
         doc.setDrawColor(230, 230, 230);
-        for (let x = 50; x < pw - 50; x += 30) {
-          for (let y = pdfAreaY; y < ph - 70; y += 30) {
-            doc.circle(x, y, 0.4, 'F');
+        for (let gx = 50; gx < pw - 50; gx += 30) {
+          for (let gy = pdfAreaY; gy < ph - 70; gy += 30) {
+            doc.circle(gx, gy, 0.4, 'F');
           }
         }
 
@@ -320,222 +729,127 @@ export async function generateUnifiedPDF(
         });
       }
 
-      // --- YARD PAGE 2: ASSETS REGISTER TABLE ---
-      currentSheetIdx++;
-      setLoadingText(`Compiling asset registry for ${yard.name}...`);
+      if (options?.includeAssetDirectory) {
+        // --- YARD PAGE 2: ASSETS REGISTER TABLE ---
+        currentSheetIdx++;
+        setLoadingText(`Compiling asset registry for ${yard.name}...`);
 
-      doc.addPage();
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, 0, pw, ph, 'F');
+        doc.addPage();
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, pw, ph, 'F');
 
-      doc.setTextColor(217, 119, 6);
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(20);
-      doc.text(`${yard.name.toUpperCase()} - ASSETS DIRECTORY`, 50, 60);
+        doc.setTextColor(217, 119, 6);
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(20);
+        doc.text(`${yard.name.toUpperCase()} - ASSETS DIRECTORY`, 50, 60);
 
-      doc.setFontSize(9);
-      doc.setTextColor(110, 110, 110);
-      doc.text(
-        `CUSTOMER: ${customerName.toUpperCase()} | PROJECT: ${title.toUpperCase()}`,
-        50,
-        80
-      );
-      doc.text(`SHEET: ${currentSheetIdx} OF ${totalSheets} (TECHNICAL DATA)`, pw - 180, 60);
+        doc.setFontSize(9);
+        doc.setTextColor(110, 110, 110);
+        doc.text(
+          `CUSTOMER: ${customerName.toUpperCase()} | PROJECT: ${title.toUpperCase()}`,
+          50,
+          80
+        );
+        doc.text(`SHEET: ${currentSheetIdx} OF ${totalSheets} (TECHNICAL DATA)`, pw - 50, 60, { align: 'right' });
 
-      const specTableRows = yard.bins.map((b) => {
-        const fallbackName =
-          b.name ||
-          (b.type === 'chester-x'
-            ? 'Chester-X'
-            : b.type === 'chester-x1'
-            ? 'Chester-X1'
-            : b.type === 'junction-box'
-            ? 'Junction Box'
-            : 'Standard Bin');
+        const getAssetPriority = (type: string) => {
+          if (type === 'chester-x' || type === 'chester-x1') return 1;
+          if (type === 'junction-box') return 2;
+          if (type === 'bin') return 3;
+          if (type === 'zone') return 4;
+          return 5;
+        };
 
-        if (b.type === 'chester-x' || b.type === 'chester-x1' || b.type === 'junction-box') {
-          return [
-            fallbackName,
-            b.type === 'chester-x'
+        const sortedBins = [...yard.bins].sort((a, b) => {
+          return getAssetPriority(a.type) - getAssetPriority(b.type);
+        });
+
+        const specTableRows = sortedBins.map((b) => {
+          const fallbackName =
+            b.name ||
+            (b.type === 'chester-x'
               ? 'Chester-X'
               : b.type === 'chester-x1'
               ? 'Chester-X1'
-              : 'Junction Box',
-            `${b.diameter}' Size`,
-            '-',
-            '-',
-            '-',
-            b.notes || '-',
+              : b.type === 'junction-box'
+              ? 'Junction Box'
+              : b.type === 'zone'
+              ? 'Zone Box'
+              : 'Standard Bin');
+
+          if (b.type === 'chester-x' || b.type === 'chester-x1' || b.type === 'junction-box') {
+            return [
+              fallbackName,
+              b.type === 'chester-x'
+                ? 'Chester-X'
+                : b.type === 'chester-x1'
+                ? 'Chester-X1'
+                : 'Junction Box',
+              `${b.diameter}' Size`,
+              '-',
+              '-',
+              '-',
+              b.notes || '-',
+            ];
+          }
+          if (b.type === 'zone') {
+            return [fallbackName, 'Zone Box', `${b.width}' x ${b.height}'`, '-', '-', '-', b.notes || '-'];
+          }
+
+          const binB = b as BinAsset;
+          const D = parseFloat(binB.diameter) || 0;
+          const H = parseFloat(binB.totalHeight) || 0;
+          const E = parseFloat(binB.eaveHeight) || 0;
+          const F = parseFloat(binB.floorThick) || 0;
+          const cap = Math.round(
+            Math.PI * Math.pow(D / 2, 2) * (Math.max(0, E - F) + (H - E) / 3) * 0.80356
+          );
+          const rec = getCableRecommendation(binB.diameter);
+
+          return [
+            fallbackName,
+            'Standard Bin',
+            `${binB.diameter}' Dia`,
+            `${cap.toLocaleString()} BU`,
+            binB.centerCable ? `${binB.centerCable}'` : `${rec.center} (Rec)`,
+            binB.radiusCable ? `${binB.radiusCable}'` : `${rec.radius} (Rec)`,
+            binB.notes || '-',
           ];
-        }
-        if (b.type === 'zone') {
-          return [fallbackName, 'Zone Box', `${b.width}' x ${b.height}'`, '-', '-', '-', b.notes || '-'];
-        }
-
-        const binB = b as BinAsset;
-        const D = parseFloat(binB.diameter) || 0;
-        const H = parseFloat(binB.totalHeight) || 0;
-        const E = parseFloat(binB.eaveHeight) || 0;
-        const F = parseFloat(binB.floorThick) || 0;
-        const cap = Math.round(
-          Math.PI * Math.pow(D / 2, 2) * (Math.max(0, E - F) + (H - E) / 3) * 0.80356
-        );
-        const rec = getCableRecommendation(binB.diameter);
-
-        return [
-          fallbackName,
-          'Standard Bin',
-          `${binB.diameter}' Dia`,
-          `${cap.toLocaleString()} BU`,
-          binB.centerCable ? `${binB.centerCable}'` : `${rec.center} (Rec)`,
-          binB.radiusCable ? `${binB.radiusCable}'` : `${rec.radius} (Rec)`,
-          binB.notes || '-',
-        ];
-      });
-
-      autoTable(doc, {
-        startY: 110,
-        head: [
-          [
-            'Asset Label',
-            'Asset Type',
-            'Dimensions',
-            'Capacity',
-            'Center Cable',
-            'Radius Cable',
-            'Technical Notes',
-          ],
-        ],
-        body: specTableRows,
-        theme: 'grid',
-        styles: {
-          fillColor: [255, 255, 255],
-          textColor: [40, 40, 40],
-          fontSize: 8,
-          cellPadding: 7,
-          lineColor: [220, 220, 220],
-        },
-        headStyles: { fillColor: [251, 191, 36], textColor: [0, 0, 0], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 248, 248] },
-        columnStyles: {
-          6: { cellWidth: 180 },
-        },
-        margin: { left: 50, right: 50 },
-      });
-    }
-
-    // Capture the blueprint diagram for each bin
-    const yardBins = project.yards.flatMap((y) =>
-      y.bins.filter((b) => b.type === 'bin').map((b) => ({ yardName: y.name, bin: b as BinAsset }))
-    );
-
-    const renderZone = document.getElementById('pdf-render-zone');
-
-    for (let bIdx = 0; bIdx < yardBins.length; bIdx++) {
-      const { yardName, bin } = yardBins[bIdx];
-      currentSheetIdx++;
-      setLoadingText(
-        `Rendering cross-section blueprint for ${yardName} -> ${bin.name}...`
-      );
-
-      doc.addPage();
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, 0, pw, ph, 'F');
-
-      doc.setTextColor(217, 119, 6);
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.text(`${yardName.toUpperCase()} - ${bin.name.toUpperCase()} BLUEPRINT`, 50, 50);
-
-      doc.setFontSize(9);
-      doc.setTextColor(110, 110, 110);
-      doc.text(`CUSTOMER: ${customerName.toUpperCase()} | PROJECT ID: ${title.toUpperCase()}`, 50, 70);
-      doc.text(`SHEET: ${currentSheetIdx} OF ${totalSheets}`, pw - 120, 50);
-
-      // We clone the current SVG element from the DOM
-      const originalSvg = document.getElementById('bin-svg');
-      if (originalSvg && renderZone) {
-        renderZone.innerHTML = '';
-        const svgClone = originalSvg.cloneNode(true) as HTMLElement;
-        svgClone.style.width = '420px';
-        svgClone.style.height = '480px';
-        svgClone.style.backgroundColor = '#050505';
-        renderZone.appendChild(svgClone);
-
-        await new Promise((r) => setTimeout(r, 150));
-        const canvasSVG = await html2canvas(svgClone, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#050505',
         });
 
-        const imgData = canvasSVG.toDataURL('image/png');
-
-        const dx = 50;
-        const dy = 100;
-
-        doc.setFillColor(248, 248, 250);
-        doc.rect(dx, dy, 280, 420, 'F');
-
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(11);
-        doc.setFont('Helvetica', 'bold');
-        doc.text('ENGINEERING SPECIFICATIONS', dx + 20, dy + 30);
-
-        doc.setFontSize(8.5);
-        doc.setFont('Helvetica', 'normal');
-        doc.setTextColor(80, 80, 80);
-
-        let sy = dy + 65;
-        const drawSpecLine = (label: string, val: string | number) => {
-          doc.setFont('Helvetica', 'bold');
-          doc.text(label, dx + 20, sy);
-          doc.setFont('Helvetica', 'normal');
-          doc.text(val.toString(), dx + 150, sy);
-          doc.setDrawColor(220, 220, 222);
-          doc.line(dx + 20, sy + 6, dx + 260, sy + 6);
-          sy += 25;
-        };
-
-        const D = parseFloat(bin.diameter) || 0;
-        const H = parseFloat(bin.totalHeight) || 0;
-        const E = parseFloat(bin.eaveHeight) || 0;
-        const F = parseFloat(bin.floorThick) || 0;
-        const cap = Math.round(
-          Math.PI * Math.pow(D / 2, 2) * (Math.max(0, E - F) + (H - E) / 3) * 0.80356
-        );
-        const rec = getCableRecommendation(bin.diameter);
-
-        drawSpecLine('Yard Location:', yardName);
-        drawSpecLine('Unit Label:', bin.name);
-        drawSpecLine('Diameter:', `${D} FT`);
-        drawSpecLine('Rings Count:', bin.rings || '-');
-        drawSpecLine('Eave Height:', `${E} FT`);
-        drawSpecLine('Total Height:', `${H} FT`);
-        drawSpecLine('Floor thickness:', `${F} FT`);
-        drawSpecLine('Capacity:', `${cap.toLocaleString()} BU`);
-        drawSpecLine('Recommended Cables:', `${rec.center + rec.radius} Total`);
-        drawSpecLine('Calculated Center:', bin.centerCable ? `${bin.centerCable} FT` : '-');
-        drawSpecLine('Calculated Radius:', bin.radiusCable ? `${bin.radiusCable} FT` : '-');
-
-        doc.setFont('Helvetica', 'bold');
-        doc.text('Technical Notes:', dx + 20, sy + 10);
-        doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(8);
-        const splitNotes = doc.splitTextToSize(bin.notes || 'No custom notes.', 240);
-        doc.text(splitNotes, dx + 20, sy + 25);
-
-        doc.setFillColor(5, 5, 5);
-        doc.rect(360, dy, 430, 420, 'F');
-        doc.addImage(imgData, 'PNG', 365, dy + 10, 420, 400);
+        autoTable(doc, {
+          startY: 110,
+          head: [
+            [
+              'Asset Label',
+              'Asset Type',
+              'Dimensions',
+              'Capacity',
+              'Center Cable',
+              'Radius Cable',
+              'Technical Notes',
+            ],
+          ],
+          body: specTableRows,
+          theme: 'grid',
+          styles: {
+            fillColor: [255, 255, 255],
+            textColor: [40, 40, 40],
+            fontSize: 8,
+            cellPadding: 7,
+            lineColor: [220, 220, 220],
+          },
+          headStyles: { fillColor: [217, 119, 6], textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [248, 248, 248] },
+          columnStyles: {
+            6: { cellWidth: 180 },
+          },
+          margin: { left: 50, right: 50 },
+        });
       }
     }
 
-    doc.save(`GrainLink_CustomerReport_${customerName.replace(/\s+/g, '_')}.pdf`);
-    if (renderZone) {
-      renderZone.innerHTML = '';
-    }
+    doc.save(`GrainLink_SitePlannerReport_${customerName.replace(/\s+/g, '_')}.pdf`);
     setLoading(false);
   } catch (err) {
     console.error(err);

@@ -56,6 +56,8 @@ export interface Yard {
 export interface Customer {
   name: string;
   phone: string;
+  email?: string;
+  location?: string;
 }
 
 export interface Project {

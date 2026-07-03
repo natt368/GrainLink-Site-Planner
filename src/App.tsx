@@ -24,6 +24,8 @@ const DEFAULT_PROJECT: Project = {
   customer: {
     name: '',
     phone: '',
+    email: '',
+    location: '',
   },
   date: new Date().toLocaleDateString(),
   activeYardId: 1001,
@@ -142,6 +144,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'planner' | 'estimator'>('dashboard');
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
   const [activeBinId, setActiveBinId] = useState<number | null>(null);
+  const [includeAssetDirectory, setIncludeAssetDirectory] = useState<boolean>(false);
 
   // Undo history stack state
   const [history, setHistory] = useState<Project[]>([]);
@@ -500,7 +503,7 @@ export default function App() {
   };
 
   const triggerPDFExport = () => {
-    generateUnifiedPDF(project, { setLoading, setLoadingText });
+    generateUnifiedPDF(project, { setLoading, setLoadingText }, { includeAssetDirectory });
   };
 
   return (
@@ -960,10 +963,53 @@ export default function App() {
               className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-400 outline-none transition-all font-semibold"
             />
           </div>
+          <div>
+            <label className="block text-[9px] font-black uppercase text-neutral-500 tracking-wider mb-1">
+              Customer Email
+            </label>
+            <input
+              type="email"
+              value={project.customer.email || ''}
+              onChange={(e) =>
+                updateProjectWithHistory((prev) => ({
+                  ...prev,
+                  customer: { ...prev.customer, email: e.target.value },
+                }))
+              }
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-400 outline-none transition-all font-semibold"
+              placeholder="customer@email.com"
+            />
+          </div>
+          <div>
+            <label className="block text-[9px] font-black uppercase text-neutral-500 tracking-wider mb-1">
+              Customer Location / Address
+            </label>
+            <input
+              type="text"
+              value={project.customer.location || ''}
+              onChange={(e) =>
+                updateProjectWithHistory((prev) => ({
+                  ...prev,
+                  customer: { ...prev.customer, location: e.target.value },
+                }))
+              }
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-400 outline-none transition-all font-semibold"
+              placeholder="e.g. Regina, SK"
+            />
+          </div>
         </div>
 
         {/* Global Unified PDF Report Export */}
-        <div className="p-6 border-t border-neutral-900 bg-neutral-950">
+        <div className="p-6 border-t border-neutral-900 bg-neutral-950 flex flex-col gap-3">
+          <label className="flex items-center gap-2.5 text-[10px] font-black uppercase text-neutral-400 select-none cursor-pointer tracking-wider hover:text-white transition-colors">
+            <input
+              type="checkbox"
+              checked={includeAssetDirectory}
+              onChange={(e) => setIncludeAssetDirectory(e.target.checked)}
+              className="accent-amber-400 h-3.5 w-3.5 rounded border-neutral-800 bg-neutral-900 text-amber-400 focus:ring-0 cursor-pointer"
+            />
+            Include Assets Directory Table
+          </label>
           <button
             onClick={triggerPDFExport}
             className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 text-black font-black text-xs uppercase rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-400/10 tracking-wider cursor-pointer"
