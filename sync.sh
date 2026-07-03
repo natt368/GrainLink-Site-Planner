@@ -14,27 +14,18 @@ if [ ! -z "$1" ]; then
 fi
 
 # Commit changes
-REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+if [ ! -z "$GITHUB_TOKEN" ]; then
+  git config --local url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/" >/dev/null 2>&1 || true
+fi
 
 if git commit -m "$MESSAGE" >/dev/null 2>&1; then
   # Pull remote changes with rebase first to prevent non-fast-forward conflicts
-  if [ ! -z "$GITHUB_TOKEN" ] && [ ! -z "$REMOTE_URL" ]; then
-    AUTH_URL=$(echo "$REMOTE_URL" | sed -e "s~https://~https://${GITHUB_TOKEN}@~")
-    git pull --rebase "$AUTH_URL" main >/dev/null 2>&1 || true
-    git push "$AUTH_URL" main >/dev/null 2>&1 || true
-  else
-    git pull --rebase origin main >/dev/null 2>&1 || true
-    git push origin main >/dev/null 2>&1 || true
-  fi
+  git pull --rebase origin main >/dev/null 2>&1 || true
+  # Push to GitHub
+  git push origin main >/dev/null 2>&1 || true
 else
-  if [ ! -z "$GITHUB_TOKEN" ] && [ ! -z "$REMOTE_URL" ]; then
-    AUTH_URL=$(echo "$REMOTE_URL" | sed -e "s~https://~https://${GITHUB_TOKEN}@~")
-    git pull --rebase "$AUTH_URL" main >/dev/null 2>&1 || true
-    git push "$AUTH_URL" main >/dev/null 2>&1 || true
-  else
-    git pull --rebase origin main >/dev/null 2>&1 || true
-    git push origin main >/dev/null 2>&1 || true
-  fi
+  git pull --rebase origin main >/dev/null 2>&1 || true
+  git push origin main >/dev/null 2>&1 || true
 fi
 
 exit 0
