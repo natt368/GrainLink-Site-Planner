@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, Yard, Asset, BinAsset } from './types';
-import landingBg from '../IMG_0538.jpeg';
 import { DashboardView } from './components/DashboardView';
 import { SitePlannerView } from './components/SitePlannerView';
 import { CableEstimatorView } from './components/CableEstimatorView';
@@ -513,7 +512,7 @@ export default function App() {
       {showLanding ? (
         <div 
           className="fixed inset-0 z-50 flex flex-col items-center justify-center text-zinc-100 px-6 py-12 overflow-y-auto bg-cover bg-center"
-          style={{ backgroundImage: `url(${landingBg})` }}
+          style={{ backgroundImage: `url('https://raw.githubusercontent.com/natt368/GrainLink-Site-Planner/main/IMG_0538.jpeg')` }}
         >
           {/* Backdrop Blur & Elegant Dark Vignette Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-neutral-950/85 to-neutral-900/40 z-0 backdrop-blur-[1px]" />
