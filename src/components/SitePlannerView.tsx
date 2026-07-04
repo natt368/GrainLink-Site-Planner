@@ -130,6 +130,63 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       ctx.stroke();
     }
 
+    // Draw Snap Alignment Lines
+    if (dragInfoRef.current.active && selectedAssetId !== null && selectedAsset) {
+      activeYard.bins.forEach((b) => {
+        if (b.id === selectedAssetId) return;
+
+        // Check X alignment (with safe tolerance for floating point comparisons)
+        if (Math.abs(selectedAsset.x - b.x) < 0.1) {
+          ctx.beginPath();
+          ctx.moveTo(b.x, top);
+          ctx.lineTo(b.x, bottom);
+          ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)'; // Amber/Gold guidelines matching the yard styling
+          ctx.lineWidth = 1.5 / view.scale;
+          ctx.setLineDash([6, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Draw helper circle indicator around aligned target object to emphasize connection
+          const isZone = b.type === 'zone';
+          const defaultDia = b.type === 'junction-box' ? 6 : 5;
+          const dia = parseFloat((b as any).diameter) || defaultDia;
+          const radius = isZone ? 0 : (dia / 2) * BASE_SCALE;
+          if (!isZone) {
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, radius + 5 / view.scale, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+            ctx.lineWidth = 1 / view.scale;
+            ctx.stroke();
+          }
+        }
+
+        // Check Y alignment (with safe tolerance for floating point comparisons)
+        if (Math.abs(selectedAsset.y - b.y) < 0.1) {
+          ctx.beginPath();
+          ctx.moveTo(left, b.y);
+          ctx.lineTo(right, b.y);
+          ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)'; // Amber/Gold guidelines matching the yard styling
+          ctx.lineWidth = 1.5 / view.scale;
+          ctx.setLineDash([6, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Draw helper circle indicator around aligned target object to emphasize connection
+          const isZone = b.type === 'zone';
+          const defaultDia = b.type === 'junction-box' ? 6 : 5;
+          const dia = parseFloat((b as any).diameter) || defaultDia;
+          const radius = isZone ? 0 : (dia / 2) * BASE_SCALE;
+          if (!isZone) {
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, radius + 5 / view.scale, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+            ctx.lineWidth = 1 / view.scale;
+            ctx.stroke();
+          }
+        }
+      });
+    }
+
     // Draw Zones first (below bins)
     activeYard.bins
       .filter((b) => b.type === 'zone')
@@ -676,13 +733,37 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       const nx = Math.round((worldPos.x - dragInfoRef.current.offset.x) / GRID_SIZE) * GRID_SIZE;
       const ny = Math.round((worldPos.y - dragInfoRef.current.offset.y) / GRID_SIZE) * GRID_SIZE;
 
+      let targetX = nx;
+      let targetY = ny;
+      const SNAP_DISTANCE = 15; // Snapping distance in world coordinates
+
+      // Find closest X and Y coordinates to snap to
+      let closestXDist = SNAP_DISTANCE;
+      let closestYDist = SNAP_DISTANCE;
+
+      activeYard.bins.forEach((b) => {
+        if (b.id === selectedAssetId) return;
+
+        const dx = Math.abs(nx - b.x);
+        if (dx < closestXDist) {
+          closestXDist = dx;
+          targetX = b.x;
+        }
+
+        const dy = Math.abs(ny - b.y);
+        if (dy < closestYDist) {
+          closestYDist = dy;
+          targetY = b.y;
+        }
+      });
+
       onUpdateProject((prev) => ({
         ...prev,
         yards: prev.yards.map((y) =>
           y.id === prev.activeYardId
             ? {
                 ...y,
-                bins: y.bins.map((b) => (b.id === selectedAssetId ? { ...b, x: nx, y: ny } : b)),
+                bins: y.bins.map((b) => (b.id === selectedAssetId ? { ...b, x: targetX, y: targetY } : b)),
               }
             : y
         ),

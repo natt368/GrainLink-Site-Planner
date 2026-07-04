@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, Yard, Asset, BinAsset } from './types';
-import landingBg from '../IMG_0538.jpeg';
+import landingBg from '../assets/IMG_0538.jpeg';
 import { DashboardView } from './components/DashboardView';
 import { SitePlannerView } from './components/SitePlannerView';
 import { CableEstimatorView } from './components/CableEstimatorView';
