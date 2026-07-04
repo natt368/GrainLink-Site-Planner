@@ -239,8 +239,10 @@ export default function App() {
 
     const isLocalDev = (import.meta as any).env?.DEV || 
                        window.location.hostname.includes('ais-dev') || 
+                       window.location.hostname.includes('ais-pre') || 
                        window.location.hostname.includes('localhost') || 
-                       window.location.hostname.includes('127.0.0.1');
+                       window.location.hostname.includes('127.0.0.1') ||
+                       localStorage.getItem('grainlink_dev_mode') === 'true';
 
     setIsDevMode(isLocalDev);
   }, [landingUser]);
@@ -297,7 +299,14 @@ export default function App() {
         setGitResult({ success: true, message: "Successfully pushed to GitHub! Your changes will be live shortly." });
         checkGitStatus(); // Refresh status
       } else {
-        setGitResult({ success: false, message: `Failed: ${data?.error || "Unknown error"}` });
+        const details = [];
+        if (data?.error) details.push(data.error);
+        if (data?.stderr) details.push(`Stderr: ${data.stderr}`);
+        if (data?.stdout) details.push(`Stdout: ${data.stdout}`);
+        setGitResult({ 
+          success: false, 
+          message: `Failed to push. Detailed log:\n${details.join("\n\n") || "Unknown error"}` 
+        });
       }
     } catch (err: any) {
       setGitResult({ success: false, message: `Network/API error: ${err.message || err}` });

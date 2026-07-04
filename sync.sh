@@ -1,11 +1,24 @@
 #!/bin/bash
 # Script to synchronize AI Studio workspace changes to GitHub
 
+echo "Starting manual git synchronization..."
+
 # Ensure we are on the main branch
-git checkout main >/dev/null 2>&1 || exit 0
+git checkout main || { echo "Failed to checkout main branch"; exit 1; }
 
 # Stage all changes
-git add -A >/dev/null 2>&1
+echo "Staging changes..."
+git add -A
+
+# Ensure user identity is configured
+if ! git config user.email >/dev/null 2>&1; then
+  echo "Configuring default local git email..."
+  git config --local user.email "nat@grainlink.com"
+fi
+if ! git config user.name >/dev/null 2>&1; then
+  echo "Configuring default local git name..."
+  git config --local user.name "nat"
+fi
 
 # Determine commit message
 MESSAGE="Sync changes from AI Studio"
@@ -13,19 +26,33 @@ if [ ! -z "$1" ]; then
   MESSAGE="$1"
 fi
 
-# Commit changes
+# Apply GITHUB_TOKEN if present
 if [ ! -z "$GITHUB_TOKEN" ]; then
-  git config --local url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/" >/dev/null 2>&1 || true
+  echo "Applying GITHUB_TOKEN authentication..."
+  git config --local url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/" || true
 fi
 
-if git commit -m "$MESSAGE" >/dev/null 2>&1; then
-  # Pull remote changes with rebase first to prevent non-fast-forward conflicts
-  git pull --rebase origin main >/dev/null 2>&1 || true
-  # Push to GitHub
-  git push origin main >/dev/null 2>&1 || true
+# Attempt to commit
+echo "Committing changes..."
+if git commit -m "$MESSAGE"; then
+  echo "Changes committed successfully."
 else
-  git pull --rebase origin main >/dev/null 2>&1 || true
-  git push origin main >/dev/null 2>&1 || true
+  echo "No local changes to commit (or commit skipped)."
 fi
 
+# Pull remote changes with rebase first to prevent non-fast-forward conflicts
+echo "Pulling remote changes..."
+if ! git pull --rebase origin main; then
+  echo "Failed to pull remote changes from GitHub."
+  exit 1
+fi
+
+# Push to GitHub
+echo "Pushing changes to GitHub..."
+if ! git push origin main; then
+  echo "Failed to push changes to GitHub."
+  exit 1
+fi
+
+echo "Manual synchronization completed successfully!"
 exit 0
