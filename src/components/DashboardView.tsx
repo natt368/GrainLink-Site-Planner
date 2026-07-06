@@ -359,6 +359,60 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           };
         }
 
+        // Normalize loadedProject bins and types to prevent crashes/unsupported fields
+        loadedProject.yards = loadedProject.yards.map(yard => ({
+          ...yard,
+          bins: (yard.bins || []).map((bin: any) => {
+            let type = bin.type;
+            if (!type) {
+              if (bin.diameter && (bin.rings || bin.centerCable || bin.radiusCable || bin.name)) {
+                type = 'bin';
+              } else {
+                type = 'bin';
+              }
+            }
+            if (type === 'bin') {
+              return {
+                id: bin.id || Date.now() + Math.random(),
+                type: 'bin',
+                name: bin.name || 'Unnamed Bin',
+                notes: bin.notes || '',
+                x: Number(bin.x) || 0,
+                y: Number(bin.y) || 0,
+                diameter: String(bin.diameter || '36'),
+                rings: String(bin.rings || '10'),
+                eaveHeight: String(bin.eaveHeight || ''),
+                totalHeight: String(bin.totalHeight || ''),
+                floorThick: String(bin.floorThick || '0'),
+                centerCable: String(bin.centerCable || ''),
+                radiusCable: String(bin.radiusCable || ''),
+                measurements: Array.isArray(bin.measurements) ? bin.measurements : []
+              } as any;
+            } else if (type === 'zone') {
+              return {
+                id: bin.id || Date.now() + Math.random(),
+                type: 'zone',
+                name: bin.name || 'Zone',
+                notes: bin.notes || '',
+                x: Number(bin.x) || 0,
+                y: Number(bin.y) || 0,
+                width: String(bin.width || '100'),
+                height: String(bin.height || '100')
+              } as any;
+            } else {
+              return {
+                id: bin.id || Date.now() + Math.random(),
+                type: type,
+                name: bin.name || '',
+                notes: bin.notes || '',
+                x: Number(bin.x) || 0,
+                y: Number(bin.y) || 0,
+                diameter: String(bin.diameter || '5')
+              } as any;
+            }
+          })
+        }));
+
         if (loadedProject.yards.length === 0) {
           const defId = Date.now();
           loadedProject.yards.push({ id: defId, name: 'Home Yard', bins: [] });

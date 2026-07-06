@@ -478,12 +478,101 @@ export default function App() {
     reader.onload = (event) => {
       try {
         const imported = JSON.parse(event.target?.result as string);
-        if (imported && typeof imported === 'object' && Array.isArray(imported.yards)) {
-          setProject(imported);
-          setShowLanding(false);
+        let loadedProject: Project;
+
+        if (Array.isArray(imported)) {
+          const mainYardId = Date.now();
+          loadedProject = {
+            name: 'Imported Legacy Layout',
+            customer: { name: 'Legacy Cust', phone: '-' },
+            date: new Date().toLocaleDateString(),
+            activeYardId: mainYardId,
+            yards: [{ id: mainYardId, name: 'Main Yard', bins: imported }],
+          };
+        } else if (imported && typeof imported === 'object' && imported.bins && !imported.yards) {
+          const mainYardId = Date.now();
+          loadedProject = {
+            name: imported.name || 'Imported Legacy Layout',
+            customer: { name: imported.client || 'Legacy Cust', phone: '-' },
+            date: new Date().toLocaleDateString(),
+            activeYardId: mainYardId,
+            yards: [{ id: mainYardId, name: 'Main Yard', bins: imported.bins }],
+          };
+        } else if (imported && typeof imported === 'object' && Array.isArray(imported.yards)) {
+          loadedProject = {
+            name: imported.name || 'Miller Site Layout',
+            customer: imported.customer || { name: 'John Miller', phone: '555-0199' },
+            date: imported.date || new Date().toLocaleDateString(),
+            activeYardId: imported.activeYardId || (imported.yards?.[0]?.id || null),
+            yards: imported.yards || [],
+          };
         } else {
           alert('Invalid project format. Make sure the JSON file is a valid GrainLink layout.');
+          return;
         }
+
+        // Normalize loadedProject bins and types to prevent crashes/unsupported fields
+        loadedProject.yards = loadedProject.yards.map(yard => ({
+          ...yard,
+          bins: (yard.bins || []).map((bin: any) => {
+            let type = bin.type;
+            if (!type) {
+              if (bin.diameter && (bin.rings || bin.centerCable || bin.radiusCable || bin.name)) {
+                type = 'bin';
+              } else {
+                type = 'bin';
+              }
+            }
+            if (type === 'bin') {
+              return {
+                id: bin.id || Date.now() + Math.random(),
+                type: 'bin',
+                name: bin.name || 'Unnamed Bin',
+                notes: bin.notes || '',
+                x: Number(bin.x) || 0,
+                y: Number(bin.y) || 0,
+                diameter: String(bin.diameter || '36'),
+                rings: String(bin.rings || '10'),
+                eaveHeight: String(bin.eaveHeight || ''),
+                totalHeight: String(bin.totalHeight || ''),
+                floorThick: String(bin.floorThick || '0'),
+                centerCable: String(bin.centerCable || ''),
+                radiusCable: String(bin.radiusCable || ''),
+                measurements: Array.isArray(bin.measurements) ? bin.measurements : []
+              } as any;
+            } else if (type === 'zone') {
+              return {
+                id: bin.id || Date.now() + Math.random(),
+                type: 'zone',
+                name: bin.name || 'Zone',
+                notes: bin.notes || '',
+                x: Number(bin.x) || 0,
+                y: Number(bin.y) || 0,
+                width: String(bin.width || '100'),
+                height: String(bin.height || '100')
+              } as any;
+            } else {
+              return {
+                id: bin.id || Date.now() + Math.random(),
+                type: type,
+                name: bin.name || '',
+                notes: bin.notes || '',
+                x: Number(bin.x) || 0,
+                y: Number(bin.y) || 0,
+                diameter: String(bin.diameter || '5')
+              } as any;
+            }
+          })
+        }));
+
+        if (loadedProject.yards.length === 0) {
+          const defId = Date.now();
+          loadedProject.yards.push({ id: defId, name: 'Home Yard', bins: [] });
+          loadedProject.activeYardId = defId;
+        }
+
+        setProject(loadedProject);
+        setShowLanding(false);
       } catch (err) {
         alert('Failed to read the JSON file. Ensure it is a valid JSON file.');
       }
