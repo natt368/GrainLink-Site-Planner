@@ -105,7 +105,7 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
 
     const bufferHeight = (10 / 12) * pixelsPerFoot;
     const crossAugerHeightFt = 10 / 12;
-    const safeTerminationFt = crossAugerHeightFt + 2.0; // 2 feet above cross auger (2.833 ft above floor)
+    const safeTerminationFt = crossAugerHeightFt + 1.0; // 1 foot above cross auger (1.833 ft above floor)
     const safeTermY = gy - fp - safeTerminationFt * pixelsPerFoot;
 
     if (snapToFeatures && activeBin) {
@@ -132,7 +132,11 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
       // 2. Check horizontal structural elements (Y coordinates)
       // - Peak line (py)
       if (Math.abs(y - py) < snapThreshold) {
-        y = py;
+        if (Math.abs(x - cx) < 0.1) {
+          y = py + 1.0 * pixelsPerFoot; // Snap to 1ft below peak height for the Center Cable
+        } else {
+          y = py;
+        }
         featureSnapped = true;
       }
       // - Eave line (ey)
@@ -140,7 +144,7 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
         y = ey;
         featureSnapped = true;
       }
-      // - Safe Cable Termination (2' above Cross/Sweep Auger)
+      // - Safe Cable Termination (1' above Cross/Sweep Auger)
       else if (Math.abs(y - safeTermY) < snapThreshold) {
         y = safeTermY;
         featureSnapped = true;
@@ -234,8 +238,8 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
         const mountHeightFt = (gy - p1.y) / pixelsPerFoot;
         // Mount point height above aeration floor
         const mountHeightAboveFloor = mountHeightFt - F;
-        // Target length to terminate 2' above cross auger
-        const idealLength = mountHeightAboveFloor - (crossAugerHeightFt + 2.0);
+        // Target length to terminate 1' above cross auger
+        const idealLength = mountHeightAboveFloor - (crossAugerHeightFt + 1.0);
         // Recommended standard cable length (nearest lower even integer, min 2')
         const recommendedLength = Math.max(2, Math.floor(idealLength / 2) * 2);
 
@@ -775,7 +779,7 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
                   const crossAugerHeightFt = 10 / 12; // 10 inches ~ 0.833 ft
                   const startHeightFt = (gy - line.p1.y) / pixelsPerFoot;
                   const mountHeightAboveFloor = startHeightFt - F;
-                  const idealLength = mountHeightAboveFloor - (crossAugerHeightFt + 2.0);
+                  const idealLength = mountHeightAboveFloor - (crossAugerHeightFt + 1.0);
                   const roundedLength = Math.max(2, Math.floor(idealLength / 2) * 2);
                   
                   // Calculate installed clearance of standard ordered cable
@@ -801,13 +805,13 @@ export const CableEstimatorView: React.FC<CableEstimatorViewProps> = ({
                     statusText = 'CRITICAL: Auger Risk';
                     statusIcon = '⚠️';
                     recommendation = `The standard ${roundedLength}' cable hangs below the top of the cross auger! High risk of $450 tearing damage during cleanout. Shorten the cable.`;
-                  } else if (clearanceAboveCrossAuger < 2.0) {
+                  } else if (clearanceAboveCrossAuger < 1.0) {
                     statusColor = 'text-amber-700';
                     statusBg = 'bg-amber-50 border-amber-200 text-neutral-800';
                     statusText = 'Caution: Low Clearance';
                     statusIcon = '⚠️';
-                    recommendation = `Standard ${roundedLength}' cable terminates only ${clearanceAboveCrossAuger.toFixed(1)}' above the cross auger (leaves less than 2' of safety clearance). Use extreme caution.`;
-                  } else if (clearanceAboveCrossAuger > 4.0) {
+                    recommendation = `Standard ${roundedLength}' cable terminates only ${clearanceAboveCrossAuger.toFixed(1)}' above the cross auger (leaves less than 1' of safety clearance). Use extreme caution.`;
+                  } else if (clearanceAboveCrossAuger > 3.0) {
                     statusColor = 'text-amber-700';
                     statusBg = 'bg-amber-50 border-amber-200 text-neutral-800';
                     statusText = 'Caution: Terminated High';
