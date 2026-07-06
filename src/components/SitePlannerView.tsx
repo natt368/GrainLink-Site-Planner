@@ -819,7 +819,63 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   };
 
   const resetView = () => {
-    setView({ x: 0, y: 0, scale: 1.0 });
+    if (!activeYard || !activeYard.bins || activeYard.bins.length === 0) {
+      setView({ x: 0, y: 0, scale: 1.0 });
+      return;
+    }
+
+    // Prioritize centering on actual standard grain bins. If none, fall back to all items (markers, zones, etc.)
+    let targetBins = activeYard.bins.filter((b) => b.type === 'bin');
+    if (targetBins.length === 0) {
+      targetBins = activeYard.bins;
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    targetBins.forEach((b) => {
+      let rX = 0;
+      let rY = 0;
+      if (b.type === 'zone') {
+        rX = ((parseFloat((b as any).width) || 20) * BASE_SCALE) / 2;
+        rY = ((parseFloat((b as any).height) || 20) * BASE_SCALE) / 2;
+      } else {
+        const dia = parseFloat((b as any).diameter) || (b.type === 'junction-box' ? 6 : 5);
+        rX = (dia / 2) * BASE_SCALE;
+        rY = (dia / 2) * BASE_SCALE;
+      }
+
+      minX = Math.min(minX, b.x - rX);
+      maxX = Math.max(maxX, b.x + rX);
+      minY = Math.min(minY, b.y - rY);
+      maxY = Math.max(maxY, b.y + rY);
+    });
+
+    const boxWidth = maxX - minX;
+    const boxHeight = maxY - minY;
+
+    // Use a comfortable safety padding around the items
+    const padding = 60;
+    const targetWidth = dimensions.width - 2 * padding;
+    const targetHeight = dimensions.height - 2 * padding;
+
+    let scale = 1.0;
+    if (boxWidth > 0 && boxHeight > 0) {
+      const scaleX = targetWidth / boxWidth;
+      const scaleY = targetHeight / boxHeight;
+      // Clamp scale to a reasonable and usable visual range (e.g., 0.3x to 2.5x zoom)
+      scale = Math.max(0.3, Math.min(2.5, Math.min(scaleX, scaleY)));
+    }
+
+    const boxCenterX = (minX + maxX) / 2;
+    const boxCenterY = (minY + maxY) / 2;
+
+    const viewX = dimensions.width / 2 - boxCenterX * scale;
+    const viewY = dimensions.height / 2 - boxCenterY * scale;
+
+    setView({ x: viewX, y: viewY, scale });
   };
 
   return (
