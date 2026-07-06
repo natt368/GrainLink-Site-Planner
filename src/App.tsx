@@ -239,10 +239,8 @@ export default function App() {
 
     const isLocalDev = (import.meta as any).env?.DEV || 
                        window.location.hostname.includes('ais-dev') || 
-                       window.location.hostname.includes('ais-pre') || 
                        window.location.hostname.includes('localhost') || 
-                       window.location.hostname.includes('127.0.0.1') ||
-                       localStorage.getItem('grainlink_dev_mode') === 'true';
+                       window.location.hostname.includes('127.0.0.1');
 
     setIsDevMode(isLocalDev);
   }, [landingUser]);
