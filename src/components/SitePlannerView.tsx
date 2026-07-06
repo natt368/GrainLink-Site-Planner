@@ -43,6 +43,10 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   // Navigation view state (zoom/pan)
   const [view, setView] = useState({ x: 0, y: 0, scale: 1.0 });
 
+  // Hovered bin state for tooltip info
+  const [hoveredBin, setHoveredBin] = useState<any | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+
   // Dragging / Interaction state
   const dragInfoRef = useRef<{
     active: boolean;
@@ -675,6 +679,44 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
 
+    // Track hover information if not actively dragging/panning/resizing
+    const isInteracting = dragInfoRef.current.active || panInfoRef.current.active || resizeInfoRef.current.active;
+    if (isInteracting) {
+      setHoveredBin(null);
+      setHoverPos(null);
+    } else {
+      const nonZones = activeYard.bins.filter((b) => b.type !== 'zone');
+      const zones = activeYard.bins.filter((b) => b.type === 'zone');
+
+      let hovered = [...nonZones].reverse().find((b) => {
+        const r = (parseFloat((b as any).diameter) / 2) * BASE_SCALE;
+        const dist = Math.sqrt(Math.pow(worldPos.x - b.x, 2) + Math.pow(worldPos.y - b.y, 2));
+        return dist < r;
+      });
+
+      if (!hovered) {
+        hovered = [...zones].reverse().find((b) => {
+          const zone = b as ZoneAsset;
+          const w = (parseFloat(zone.width) || 20) * BASE_SCALE;
+          const h = (parseFloat(zone.height) || 20) * BASE_SCALE;
+          return (
+            worldPos.x >= zone.x - w / 2 &&
+            worldPos.x <= zone.x + w / 2 &&
+            worldPos.y >= zone.y - h / 2 &&
+            worldPos.y <= zone.y + h / 2
+          );
+        });
+      }
+
+      if (hovered) {
+        setHoveredBin(hovered);
+        setHoverPos({ x: mouseX, y: mouseY });
+      } else {
+        setHoveredBin(null);
+        setHoverPos(null);
+      }
+    }
+
     // Set cursors
     let hoverResizeHandle = false;
     if (selectedAsset && selectedAsset.type === 'zone') {
@@ -1115,10 +1157,133 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseLeave={() => {
+            handleMouseUp();
+            setHoveredBin(null);
+            setHoverPos(null);
+          }}
           onWheel={handleWheel}
           onDoubleClick={handleDoubleClick}
         />
+
+        {/* Hover Information Tooltip */}
+        {hoveredBin && hoverPos && (() => {
+          let posX = hoverPos.x + 16;
+          let posY = hoverPos.y + 16;
+          if (posX + 256 > dimensions.width) {
+            posX = hoverPos.x - 272;
+          }
+          if (posY + 220 > dimensions.height) {
+            posY = Math.max(10, dimensions.height - 240);
+          }
+          return (
+            <div
+              className="absolute z-50 pointer-events-none bg-neutral-950/95 backdrop-blur-md border border-neutral-800 rounded-xl p-3 shadow-2xl text-white text-xs w-64 select-none animate-fade-in"
+              style={{
+                left: posX,
+                top: posY,
+              }}
+            >
+              {hoveredBin.type === 'bin' && (
+                <>
+                  <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5 mb-2">
+                    <span className="font-extrabold tracking-wide text-amber-400 text-sm">{hoveredBin.name || 'Unnamed Bin'}</span>
+                    <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded font-mono uppercase tracking-wider">Grain Bin</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 font-semibold">Diameter:</span>
+                      <span className="font-mono text-neutral-200 font-bold">{hoveredBin.diameter ? `${hoveredBin.diameter}'` : '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 font-semibold">Rings:</span>
+                      <span className="font-mono text-neutral-200 font-bold">{hoveredBin.rings || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 font-semibold">Eave Ht:</span>
+                      <span className="font-mono text-neutral-200 font-bold">{hoveredBin.eaveHeight ? `${hoveredBin.eaveHeight}'` : '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 font-semibold">Total Ht:</span>
+                      <span className="font-mono text-neutral-200 font-bold">{hoveredBin.totalHeight ? `${hoveredBin.totalHeight}'` : '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between col-span-2 border-t border-neutral-900 pt-1 mt-1">
+                      <span className="text-neutral-500 font-semibold">Center Cable:</span>
+                      <span className="font-mono text-amber-500/90 font-bold">{hoveredBin.centerCable ? `${hoveredBin.centerCable}'` : '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between col-span-2">
+                      <span className="text-neutral-500 font-semibold">Radius Cable:</span>
+                      <span className="font-mono text-amber-500/90 font-bold">{hoveredBin.radiusCable ? `${hoveredBin.radiusCable}'` : '-'}</span>
+                    </div>
+                    {hoveredBin.floorThick && hoveredBin.floorThick !== '0' && (
+                      <div className="flex items-center justify-between col-span-2">
+                        <span className="text-neutral-500 font-semibold">Floor Thick:</span>
+                        <span className="font-mono text-neutral-200 font-bold">{hoveredBin.floorThick}"</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {hoveredBin.notes && (
+                    <div className="mt-2 pt-1.5 border-t border-neutral-800 text-[10px] text-neutral-400 italic break-words leading-relaxed">
+                      {hoveredBin.notes}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {hoveredBin.type === 'zone' && (
+                <>
+                  <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5 mb-2">
+                    <span className="font-extrabold tracking-wide text-amber-400 text-sm">{hoveredBin.name || 'Zone'}</span>
+                    <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded font-mono uppercase tracking-wider">Zone</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-y-1 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 font-semibold">Width:</span>
+                      <span className="font-mono text-neutral-200 font-bold">{hoveredBin.width ? `${hoveredBin.width}'` : '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 font-semibold">Height:</span>
+                      <span className="font-mono text-neutral-200 font-bold">{hoveredBin.height ? `${hoveredBin.height}'` : '-'}</span>
+                    </div>
+                  </div>
+
+                  {hoveredBin.notes && (
+                    <div className="mt-2 pt-1.5 border-t border-neutral-800 text-[10px] text-neutral-400 italic break-words leading-relaxed">
+                      {hoveredBin.notes}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {hoveredBin.type !== 'bin' && hoveredBin.type !== 'zone' && (
+                <>
+                  <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5 mb-2">
+                    <span className="font-extrabold tracking-wide text-amber-400 text-sm">{hoveredBin.name || 'Marker'}</span>
+                    <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded font-mono uppercase tracking-wider">
+                      {hoveredBin.type === 'chester-x' ? 'Chester-X' : hoveredBin.type === 'chester-x1' ? 'Chester-X1' : hoveredBin.type === 'junction-box' ? 'J-Box' : 'Marker'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-y-1 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 font-semibold">Size:</span>
+                      <span className="font-mono text-neutral-200 font-bold">{hoveredBin.diameter ? `${hoveredBin.diameter}'` : '-'}</span>
+                    </div>
+                  </div>
+
+                  {hoveredBin.notes && (
+                    <div className="mt-2 pt-1.5 border-t border-neutral-800 text-[10px] text-neutral-400 italic break-words leading-relaxed">
+                      {hoveredBin.notes}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Yard Indicator / Quick Switcher HUD */}
         <div className="absolute top-6 left-6 flex flex-wrap items-center gap-3">
