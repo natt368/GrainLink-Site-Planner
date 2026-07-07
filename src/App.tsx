@@ -903,7 +903,7 @@ export default function App() {
       )}
 
       {/* Main Sidebar */}
-      <aside className="w-64 bg-neutral-950 border-r border-neutral-900 flex flex-col z-20 shadow-2xl shrink-0">
+      <aside className="w-64 bg-neutral-950 border-r border-neutral-900 flex flex-col z-20 shadow-2xl shrink-0 overflow-y-auto">
         <div 
           onClick={() => setShowLanding(true)}
           className="p-6 border-b border-neutral-900 flex flex-col items-start cursor-pointer hover:bg-neutral-900/20 transition-all group"
@@ -1128,6 +1128,9 @@ export default function App() {
             onLocateAsset={handleLocateAsset}
             lastSavedTime={lastAutoSaved}
             onSaveComplete={() => setLastAutoSaved(new Date())}
+            onTriggerPDFExport={triggerPDFExport}
+            includeAssetDirectory={includeAssetDirectory}
+            onToggleIncludeAssetDirectory={setIncludeAssetDirectory}
           />
         )}
 
