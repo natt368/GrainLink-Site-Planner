@@ -1128,9 +1128,6 @@ export default function App() {
             onLocateAsset={handleLocateAsset}
             lastSavedTime={lastAutoSaved}
             onSaveComplete={() => setLastAutoSaved(new Date())}
-            onTriggerPDFExport={triggerPDFExport}
-            includeAssetDirectory={includeAssetDirectory}
-            onToggleIncludeAssetDirectory={setIncludeAssetDirectory}
           />
         )}
 

@@ -25,9 +25,6 @@ interface DashboardViewProps {
   onLocateAsset: (assetId: number) => void;
   lastSavedTime?: Date | null;
   onSaveComplete?: () => void;
-  onTriggerPDFExport?: () => void;
-  includeAssetDirectory?: boolean;
-  onToggleIncludeAssetDirectory?: (include: boolean) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -38,9 +35,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onLocateAsset,
   lastSavedTime,
   onSaveComplete,
-  onTriggerPDFExport,
-  includeAssetDirectory = false,
-  onToggleIncludeAssetDirectory,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -867,29 +861,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Save size={14} className="text-amber-400" />
               Export JSON File
             </button>
-
-            {/* 4. Generate Unified PDF */}
-            {onTriggerPDFExport && (
-              <div className="border-t border-neutral-900 pt-3.5 mt-1 flex flex-col gap-2.5">
-                <label className="flex items-center gap-2.5 text-[10px] font-black uppercase text-neutral-400 select-none cursor-pointer tracking-wider hover:text-white transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={includeAssetDirectory}
-                    onChange={(e) => onToggleIncludeAssetDirectory?.(e.target.checked)}
-                    className="accent-amber-400 h-3.5 w-3.5 rounded border-neutral-800 bg-neutral-900 text-amber-400 focus:ring-0 cursor-pointer"
-                  />
-                  Include Assets Directory Table
-                </label>
-                <button
-                  onClick={onTriggerPDFExport}
-                  className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-black font-black text-xs uppercase rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-400/15 tracking-wider cursor-pointer"
-                  title="Generate dynamic landscape PDF Report of all yards"
-                >
-                  <Download size={14} strokeWidth={2.5} />
-                  GENERATE SUITE PDF
-                </button>
-              </div>
-            )}
           </div>
 
           <p className="text-[9px] text-neutral-600 font-bold uppercase tracking-wider mt-1 text-center">
