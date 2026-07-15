@@ -43,6 +43,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   // Navigation view state (zoom/pan)
   const [view, setView] = useState({ x: 0, y: 0, scale: 1.0 });
 
+  // Snap to Grid toggling state
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
+
   // Hovered bin state for tooltip info
   const [hoveredBin, setHoveredBin] = useState<any | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
@@ -135,7 +138,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     }
 
     // Draw Snap Alignment Lines
-    if (dragInfoRef.current.active && selectedAssetId !== null && selectedAsset) {
+    if (snapToGrid && dragInfoRef.current.active && selectedAssetId !== null && selectedAsset) {
       activeYard.bins.forEach((b) => {
         if (b.id === selectedAssetId) return;
 
@@ -333,8 +336,8 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       floorThick: '1.5',
       notes: '',
       measurements: [],
-      x: Math.round(worldCenter.x / GRID_SIZE) * GRID_SIZE,
-      y: Math.round(worldCenter.y / GRID_SIZE) * GRID_SIZE,
+      x: snapToGrid ? Math.round(worldCenter.x / GRID_SIZE) * GRID_SIZE : worldCenter.x,
+      y: snapToGrid ? Math.round(worldCenter.y / GRID_SIZE) * GRID_SIZE : worldCenter.y,
     };
 
     onUpdateProject((prev) => ({
@@ -364,8 +367,8 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       name: `${labelPrefix} ${count}`,
       diameter: markerType === 'junction-box' ? '6' : '5',
       notes: '',
-      x: Math.round(worldCenter.x / GRID_SIZE) * GRID_SIZE,
-      y: Math.round(worldCenter.y / GRID_SIZE) * GRID_SIZE,
+      x: snapToGrid ? Math.round(worldCenter.x / GRID_SIZE) * GRID_SIZE : worldCenter.x,
+      y: snapToGrid ? Math.round(worldCenter.y / GRID_SIZE) * GRID_SIZE : worldCenter.y,
     };
 
     onUpdateProject((prev) => ({
@@ -388,8 +391,8 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       width: '60',
       height: '40',
       notes: '',
-      x: Math.round(worldCenter.x / GRID_SIZE) * GRID_SIZE,
-      y: Math.round(worldCenter.y / GRID_SIZE) * GRID_SIZE,
+      x: snapToGrid ? Math.round(worldCenter.x / GRID_SIZE) * GRID_SIZE : worldCenter.x,
+      y: snapToGrid ? Math.round(worldCenter.y / GRID_SIZE) * GRID_SIZE : worldCenter.y,
     };
 
     onUpdateProject((prev) => ({
@@ -520,14 +523,15 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       if (selectedAssetId !== null && selectedAsset) {
         let dx = 0;
         let dy = 0;
+        const step = snapToGrid ? GRID_SIZE : 1;
         if (e.key === 'ArrowUp') {
-          dy = -GRID_SIZE;
+          dy = -step;
         } else if (e.key === 'ArrowDown') {
-          dy = GRID_SIZE;
+          dy = step;
         } else if (e.key === 'ArrowLeft') {
-          dx = -GRID_SIZE;
+          dx = -step;
         } else if (e.key === 'ArrowRight') {
-          dx = GRID_SIZE;
+          dx = step;
         }
 
         if (dx !== 0 || dy !== 0) {
@@ -745,10 +749,10 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       const ax = resizeInfoRef.current.anchorX;
       const ay = resizeInfoRef.current.anchorY;
 
-      let newW = Math.round((worldPos.x - ax) / GRID_SIZE) * GRID_SIZE;
-      let newH = Math.round((worldPos.y - ay) / GRID_SIZE) * GRID_SIZE;
-      newW = Math.max(GRID_SIZE * 2, newW);
-      newH = Math.max(GRID_SIZE * 2, newH);
+      let newW = snapToGrid ? Math.round((worldPos.x - ax) / GRID_SIZE) * GRID_SIZE : (worldPos.x - ax);
+      let newH = snapToGrid ? Math.round((worldPos.y - ay) / GRID_SIZE) * GRID_SIZE : (worldPos.y - ay);
+      newW = Math.max(snapToGrid ? GRID_SIZE * 2 : 2, newW);
+      newH = Math.max(snapToGrid ? GRID_SIZE * 2 : 2, newH);
 
       onUpdateProject((prev) => ({
         ...prev,
@@ -772,32 +776,35 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
         ),
       }));
     } else if (dragInfoRef.current.active && selectedAssetId !== null) {
-      const nx = Math.round((worldPos.x - dragInfoRef.current.offset.x) / GRID_SIZE) * GRID_SIZE;
-      const ny = Math.round((worldPos.y - dragInfoRef.current.offset.y) / GRID_SIZE) * GRID_SIZE;
+      const nx = snapToGrid ? Math.round((worldPos.x - dragInfoRef.current.offset.x) / GRID_SIZE) * GRID_SIZE : (worldPos.x - dragInfoRef.current.offset.x);
+      const ny = snapToGrid ? Math.round((worldPos.y - dragInfoRef.current.offset.y) / GRID_SIZE) * GRID_SIZE : (worldPos.y - dragInfoRef.current.offset.y);
 
       let targetX = nx;
       let targetY = ny;
-      const SNAP_DISTANCE = 15; // Snapping distance in world coordinates
 
-      // Find closest X and Y coordinates to snap to
-      let closestXDist = SNAP_DISTANCE;
-      let closestYDist = SNAP_DISTANCE;
+      if (snapToGrid) {
+        const SNAP_DISTANCE = 15; // Snapping distance in world coordinates
 
-      activeYard.bins.forEach((b) => {
-        if (b.id === selectedAssetId) return;
+        // Find closest X and Y coordinates to snap to
+        let closestXDist = SNAP_DISTANCE;
+        let closestYDist = SNAP_DISTANCE;
 
-        const dx = Math.abs(nx - b.x);
-        if (dx < closestXDist) {
-          closestXDist = dx;
-          targetX = b.x;
-        }
+        activeYard.bins.forEach((b) => {
+          if (b.id === selectedAssetId) return;
 
-        const dy = Math.abs(ny - b.y);
-        if (dy < closestYDist) {
-          closestYDist = dy;
-          targetY = b.y;
-        }
-      });
+          const dx = Math.abs(nx - b.x);
+          if (dx < closestXDist) {
+            closestXDist = dx;
+            targetX = b.x;
+          }
+
+          const dy = Math.abs(ny - b.y);
+          if (dy < closestYDist) {
+            closestYDist = dy;
+            targetY = b.y;
+          }
+        });
+      }
 
       onUpdateProject((prev) => ({
         ...prev,
@@ -993,6 +1000,31 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
             </div>
           </section>
 
+          {/* Planner Settings */}
+          <section className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl space-y-3">
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+              <Settings size={12} className="text-amber-400" />
+              Planner Settings
+            </h2>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-neutral-300 font-bold uppercase tracking-wider select-none">Snap to Grid</span>
+              <button
+                onClick={() => setSnapToGrid(!snapToGrid)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  snapToGrid ? 'bg-amber-400' : 'bg-neutral-800'
+                }`}
+                role="switch"
+                aria-checked={snapToGrid}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-neutral-950 shadow ring-0 transition duration-200 ease-in-out ${
+                    snapToGrid ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </section>
+
           {/* Properties Panel */}
           <div id="properties-panel">
             {selectedAsset ? (
@@ -1140,7 +1172,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                 <p className="text-xs font-medium uppercase tracking-wider leading-relaxed text-neutral-500">
                   Select item to configure
                   <br />
-                  Auto-snap active
+                  <span className={snapToGrid ? 'text-amber-600 font-bold' : 'text-neutral-500'}>
+                    {snapToGrid ? 'Auto-snap active' : 'Snapping disabled'}
+                  </span>
                 </p>
               </div>
             )}
@@ -1335,9 +1369,18 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           >
             Reset View
           </button>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-neutral-600 bg-neutral-950/85 backdrop-blur-md px-3 py-2 rounded-lg border border-neutral-900">
-            Snap-to-Grid: {GRID_SIZE}px
-          </div>
+          <button
+            onClick={() => setSnapToGrid(!snapToGrid)}
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border transition-all text-xs font-bold uppercase tracking-wider cursor-pointer shadow-lg ${
+              snapToGrid
+                ? 'bg-amber-400/10 border-amber-500/30 text-amber-400 hover:bg-amber-400/20'
+                : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
+            }`}
+            title="Toggle Snap to Grid & Guidelines"
+          >
+            <div className={`w-1.5 h-1.5 rounded-full transition-colors ${snapToGrid ? 'bg-amber-400 animate-pulse' : 'bg-neutral-600'}`} />
+            Snap: {snapToGrid ? 'ON' : 'OFF'}
+          </button>
         </div>
       </div>
     </div>
