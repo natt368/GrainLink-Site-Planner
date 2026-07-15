@@ -46,6 +46,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   // Snap to Grid toggling state
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
 
+  // Snap to Object toggling state
+  const [snapToObject, setSnapToObject] = useState<boolean>(true);
+
   // Hovered bin state for tooltip info
   const [hoveredBin, setHoveredBin] = useState<any | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
@@ -138,7 +141,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     }
 
     // Draw Snap Alignment Lines
-    if (snapToGrid && dragInfoRef.current.active && selectedAssetId !== null && selectedAsset) {
+    if (snapToObject && dragInfoRef.current.active && selectedAssetId !== null && selectedAsset) {
       activeYard.bins.forEach((b) => {
         if (b.id === selectedAssetId) return;
 
@@ -782,7 +785,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       let targetX = nx;
       let targetY = ny;
 
-      if (snapToGrid) {
+      if (snapToObject) {
         const SNAP_DISTANCE = 15; // Snapping distance in world coordinates
 
         // Find closest X and Y coordinates to snap to
@@ -934,50 +937,77 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
         <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-neutral-950 custom-scrollbar">
           {/* Markers and Zones */}
           <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-4 flex items-center gap-2">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
               Markers &amp; Zones
             </h2>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              {/* Compact Menu Select Dropdown */}
+              <select
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!val) return;
+                  if (val === 'zone') {
+                    handleAddZoneBox();
+                  } else {
+                    handleAddSpecialMarker(val as any);
+                  }
+                  e.target.value = ''; // Reset select
+                }}
+                className="w-full bg-neutral-900 border border-neutral-800 hover:border-amber-400 text-neutral-200 hover:text-white px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all outline-none cursor-pointer"
+                defaultValue=""
+              >
+                <option value="" disabled>+ Add Marker / Zone...</option>
+                <option value="chester-x" className="bg-neutral-950 text-neutral-200">Chester-X</option>
+                <option value="chester-x1" className="bg-neutral-950 text-neutral-200">Chester-X1</option>
+                <option value="zone" className="bg-neutral-950 text-neutral-200">Zone Marker</option>
+                <option value="junction-box" className="bg-neutral-950 text-neutral-200">Junction Box</option>
+              </select>
+
+              {/* Squeezed quick-add grid of mini buttons */}
+              <div className="grid grid-cols-4 gap-1.5 w-full">
                 <button
                   onClick={() => handleAddSpecialMarker('chester-x')}
-                  className="flex flex-col items-center justify-center p-4 rounded-xl border border-neutral-350 bg-neutral-200 hover:border-red-500 hover:bg-red-500/5 transition-all group cursor-pointer"
+                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-red-500/50 hover:bg-red-500/5 text-red-500 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  title="Quick Add Chester-X"
                 >
-                  <span className="text-red-500 font-black text-2xl mb-2 group-hover:scale-110 transition-transform">X</span>
-                  <span className="text-[11px] font-bold text-neutral-800 group-hover:text-red-600">Chester-X</span>
+                  <span className="leading-none mb-0.5">X</span>
+                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Chester</span>
                 </button>
                 <button
                   onClick={() => handleAddSpecialMarker('chester-x1')}
-                  className="flex flex-col items-center justify-center p-4 rounded-xl border border-neutral-350 bg-neutral-200 hover:border-blue-500 hover:bg-blue-500/5 transition-all group cursor-pointer"
+                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-blue-500/50 hover:bg-blue-500/5 text-blue-400 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  title="Quick Add Chester-X1"
                 >
-                  <span className="text-blue-500 font-black text-2xl mb-2 group-hover:scale-110 transition-transform">X</span>
-                  <span className="text-[11px] font-bold text-neutral-800 group-hover:text-blue-600">Chester-X1</span>
+                  <span className="leading-none mb-0.5">X1</span>
+                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Chester</span>
+                </button>
+                <button
+                  onClick={handleAddZoneBox}
+                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-amber-500 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  title="Quick Add Zone Box"
+                >
+                  <svg
+                    className="w-2.5 h-2.5 text-amber-500 mb-0.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 3" />
+                  </svg>
+                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Zone</span>
+                </button>
+                <button
+                  onClick={() => handleAddSpecialMarker('junction-box')}
+                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-emerald-400 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  title="Quick Add Junction Box"
+                >
+                  <span className="leading-none mb-0.5">JB</span>
+                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Junction</span>
                 </button>
               </div>
-              <button
-                onClick={handleAddZoneBox}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-neutral-350 bg-neutral-200 hover:border-amber-500 hover:bg-amber-500/5 transition-all group text-sm font-bold text-neutral-800 hover:text-amber-600 cursor-pointer"
-              >
-                <svg
-                  className="w-4 h-4 text-amber-500"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 3" />
-                </svg>
-                Zone Marker
-              </button>
-              <button
-                onClick={() => handleAddSpecialMarker('junction-box')}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-neutral-350 bg-neutral-200 hover:border-emerald-500 hover:bg-emerald-500/5 transition-all group text-sm font-bold text-neutral-800 hover:text-emerald-600 cursor-pointer"
-              >
-                <span className="text-emerald-500 font-black text-lg leading-none group-hover:scale-110 transition-transform">X</span>
-                Junction Box
-              </button>
             </div>
           </section>
 
@@ -1000,30 +1030,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
             </div>
           </section>
 
-          {/* Planner Settings */}
-          <section className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl space-y-3">
-            <h2 className="text-[10px] font-black uppercase tracking-widest text-neutral-500 flex items-center gap-2">
-              <Settings size={12} className="text-amber-400" />
-              Planner Settings
-            </h2>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-300 font-bold uppercase tracking-wider select-none">Snap to Grid</span>
-              <button
-                onClick={() => setSnapToGrid(!snapToGrid)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  snapToGrid ? 'bg-amber-400' : 'bg-neutral-800'
-                }`}
-                role="switch"
-                aria-checked={snapToGrid}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-neutral-950 shadow ring-0 transition duration-200 ease-in-out ${
-                    snapToGrid ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </section>
+
 
           {/* Properties Panel */}
           <div id="properties-panel">
@@ -1362,7 +1369,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           </div>
         </div>
 
-        <div className="absolute bottom-6 left-6 flex items-center gap-4">
+        <div className="absolute bottom-6 left-6 flex flex-wrap items-center gap-3">
           <button
             onClick={resetView}
             className="bg-neutral-900 hover:bg-neutral-800 text-neutral-400 px-4 py-2.5 rounded-xl border border-neutral-800 transition-colors shadow-lg flex items-center gap-2 text-xs font-bold uppercase tracking-wider cursor-pointer"
@@ -1376,10 +1383,22 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                 ? 'bg-amber-400/10 border-amber-500/30 text-amber-400 hover:bg-amber-400/20'
                 : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
             }`}
-            title="Toggle Snap to Grid & Guidelines"
+            title="Toggle Snap to Grid Lines"
           >
             <div className={`w-1.5 h-1.5 rounded-full transition-colors ${snapToGrid ? 'bg-amber-400 animate-pulse' : 'bg-neutral-600'}`} />
-            Snap: {snapToGrid ? 'ON' : 'OFF'}
+            Grid Snap: {snapToGrid ? 'ON' : 'OFF'}
+          </button>
+          <button
+            onClick={() => setSnapToObject(!snapToObject)}
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border transition-all text-xs font-bold uppercase tracking-wider cursor-pointer shadow-lg ${
+              snapToObject
+                ? 'bg-amber-400/10 border-amber-500/30 text-amber-400 hover:bg-amber-400/20'
+                : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
+            }`}
+            title="Toggle Snap to Other Objects and Alignment Guidelines"
+          >
+            <div className={`w-1.5 h-1.5 rounded-full transition-colors ${snapToObject ? 'bg-amber-400 animate-pulse' : 'bg-neutral-600'}`} />
+            Object Snap: {snapToObject ? 'ON' : 'OFF'}
           </button>
         </div>
       </div>
