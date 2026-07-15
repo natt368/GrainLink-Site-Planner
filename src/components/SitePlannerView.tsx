@@ -933,8 +933,8 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   return (
     <div id="view-planner" className="flex-1 flex h-full w-full overflow-hidden">
       {/* Planner Sidebar */}
-      <aside className="w-80 bg-neutral-950 border-r border-neutral-900 flex flex-col z-10 shrink-0">
-        <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-neutral-950 custom-scrollbar">
+      <aside className="w-64 bg-neutral-950 border-r border-neutral-900 flex flex-col z-10 shrink-0">
+        <div className="flex-grow overflow-y-auto p-4 space-y-5 bg-neutral-950 custom-scrollbar">
           {/* Markers and Zones */}
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
@@ -1013,18 +1013,19 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
 
           {/* Add Bin Presets */}
           <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-4 flex items-center gap-2">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
               Add Bin Unit
             </h2>
-            <div id="bin-presets" className="grid grid-cols-2 gap-3">
+            <div id="bin-presets" className="grid grid-cols-3 gap-1.5">
               {BIN_SIZES.map((size) => (
                 <button
                   key={size}
                   onClick={() => handleAddBin(size)}
-                  className="flex flex-col items-center justify-center p-4 rounded-xl border border-neutral-350 bg-neutral-200 hover:border-amber-500 hover:bg-amber-500/5 transition-all group cursor-pointer"
+                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-amber-500 transition-all cursor-pointer group"
+                  title={`Add ${size}' Grain Bin`}
                 >
-                  <div className="rounded-full border border-amber-500/40 group-hover:border-amber-500 mb-2 transition-colors w-7 h-7 border-2"></div>
-                  <span className="text-xs font-bold text-neutral-800 group-hover:text-amber-600">{size}' Bin</span>
+                  <div className="rounded-full border border-amber-500/40 group-hover:border-amber-500 mb-1 transition-colors w-3.5 h-3.5 border-2"></div>
+                  <span className="text-[10px] font-bold text-neutral-300 group-hover:text-amber-400">{size}' Bin</span>
                 </button>
               ))}
             </div>
@@ -1035,7 +1036,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           {/* Properties Panel */}
           <div id="properties-panel">
             {selectedAsset ? (
-              <div className="bg-neutral-200 p-5 rounded-2xl border border-neutral-350 space-y-4 text-neutral-900">
+              <div className="bg-neutral-200 p-3.5 rounded-xl border border-neutral-350 space-y-3.5 text-neutral-900">
                 <h2 className="text-xs font-black uppercase tracking-widest text-neutral-800">
                   {selectedAsset.type === 'bin'
                     ? 'Grain Bin Properties'
