@@ -933,11 +933,11 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   return (
     <div id="view-planner" className="flex-1 flex h-full w-full overflow-hidden">
       {/* Planner Sidebar */}
-      <aside className="w-64 bg-neutral-950 border-r border-neutral-900 flex flex-col z-10 shrink-0">
-        <div className="flex-grow overflow-y-auto p-4 space-y-5 bg-neutral-950 custom-scrollbar">
+      <aside className="w-52 bg-neutral-950 border-r border-neutral-900 flex flex-col z-10 shrink-0">
+        <div className="flex-grow overflow-y-auto p-3.5 space-y-4 bg-neutral-950 custom-scrollbar">
           {/* Markers and Zones */}
           <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-2">
               Markers &amp; Zones
             </h2>
             <div className="space-y-2">
@@ -963,49 +963,51 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                 <option value="junction-box" className="bg-neutral-950 text-neutral-200">Junction Box</option>
               </select>
 
-              {/* Squeezed quick-add grid of mini buttons */}
-              <div className="grid grid-cols-4 gap-1.5 w-full">
+              {/* Squeezed quick-add grid of stacked buttons */}
+              <div className="flex flex-col gap-1.5 w-full">
                 <button
                   onClick={() => handleAddSpecialMarker('chester-x')}
-                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-red-500/50 hover:bg-red-500/5 text-red-500 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  className="flex items-center gap-2.5 w-full py-1.5 px-2.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-red-500/50 hover:bg-red-500/5 text-red-500 text-xs font-bold transition-all cursor-pointer text-left"
                   title="Quick Add Chester-X"
                 >
-                  <span className="leading-none mb-0.5">X</span>
-                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Chester</span>
+                  <span className="font-black text-sm w-4 text-center shrink-0">X</span>
+                  <span className="text-neutral-300 font-bold text-[11px]">Chester-X</span>
                 </button>
                 <button
                   onClick={() => handleAddSpecialMarker('chester-x1')}
-                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-blue-500/50 hover:bg-blue-500/5 text-blue-400 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  className="flex items-center gap-2.5 w-full py-1.5 px-2.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-blue-500/50 hover:bg-blue-500/5 text-blue-400 text-xs font-bold transition-all cursor-pointer text-left"
                   title="Quick Add Chester-X1"
                 >
-                  <span className="leading-none mb-0.5">X1</span>
-                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Chester</span>
+                  <span className="font-black text-sm w-4 text-center shrink-0">X1</span>
+                  <span className="text-neutral-300 font-bold text-[11px]">Chester-X1</span>
                 </button>
                 <button
                   onClick={handleAddZoneBox}
-                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-amber-500 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  className="flex items-center gap-2.5 w-full py-1.5 px-2.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-amber-500 text-xs font-bold transition-all cursor-pointer text-left"
                   title="Quick Add Zone Box"
                 >
-                  <svg
-                    className="w-2.5 h-2.5 text-amber-500 mb-0.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 3" />
-                  </svg>
-                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Zone</span>
+                  <div className="w-4 flex justify-center shrink-0">
+                    <svg
+                      className="w-3.5 h-3.5 text-amber-500"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 3" />
+                    </svg>
+                  </div>
+                  <span className="text-neutral-300 font-bold text-[11px]">Zone Box</span>
                 </button>
                 <button
                   onClick={() => handleAddSpecialMarker('junction-box')}
-                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-emerald-400 text-[10px] font-black uppercase tracking-tight transition-all cursor-pointer"
+                  className="flex items-center gap-2.5 w-full py-1.5 px-2.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-emerald-400 text-xs font-bold transition-all cursor-pointer text-left"
                   title="Quick Add Junction Box"
                 >
-                  <span className="leading-none mb-0.5">JB</span>
-                  <span className="text-[8px] text-neutral-400 font-bold scale-90">Junction</span>
+                  <span className="font-black text-[11px] w-4 text-center shrink-0">JB</span>
+                  <span className="text-neutral-300 font-bold text-[11px]">Junction Box</span>
                 </button>
               </div>
             </div>
@@ -1013,19 +1015,19 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
 
           {/* Add Bin Presets */}
           <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-2">
               Add Bin Unit
             </h2>
-            <div id="bin-presets" className="grid grid-cols-3 gap-1.5">
+            <div id="bin-presets" className="flex flex-col gap-1.5 w-full">
               {BIN_SIZES.map((size) => (
                 <button
                   key={size}
                   onClick={() => handleAddBin(size)}
-                  className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-amber-500 transition-all cursor-pointer group"
+                  className="flex items-center gap-2.5 w-full py-1.5 px-2.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-amber-500 transition-all cursor-pointer group text-left text-xs font-bold"
                   title={`Add ${size}' Grain Bin`}
                 >
-                  <div className="rounded-full border border-amber-500/40 group-hover:border-amber-500 mb-1 transition-colors w-3.5 h-3.5 border-2"></div>
-                  <span className="text-[10px] font-bold text-neutral-300 group-hover:text-amber-400">{size}' Bin</span>
+                  <div className="rounded-full border border-amber-500/40 group-hover:border-amber-500 transition-colors w-3 h-3 border-2 shrink-0"></div>
+                  <span className="text-neutral-300 group-hover:text-amber-400 font-bold text-[11px]">{size}' Grain Bin</span>
                 </button>
               ))}
             </div>
