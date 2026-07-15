@@ -941,28 +941,6 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
               Markers &amp; Zones
             </h2>
             <div className="space-y-2">
-              {/* Compact Menu Select Dropdown */}
-              <select
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) return;
-                  if (val === 'zone') {
-                    handleAddZoneBox();
-                  } else {
-                    handleAddSpecialMarker(val as any);
-                  }
-                  e.target.value = ''; // Reset select
-                }}
-                className="w-full bg-neutral-900 border border-neutral-800 hover:border-amber-400 text-neutral-200 hover:text-white px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all outline-none cursor-pointer"
-                defaultValue=""
-              >
-                <option value="" disabled>+ Add Marker / Zone...</option>
-                <option value="chester-x" className="bg-neutral-950 text-neutral-200">Chester-X</option>
-                <option value="chester-x1" className="bg-neutral-950 text-neutral-200">Chester-X1</option>
-                <option value="zone" className="bg-neutral-950 text-neutral-200">Zone Marker</option>
-                <option value="junction-box" className="bg-neutral-950 text-neutral-200">Junction Box</option>
-              </select>
-
               {/* Squeezed quick-add grid of stacked buttons */}
               <div className="flex flex-col gap-1.5 w-full">
                 <button
