@@ -861,7 +861,7 @@ export async function generateUnifiedPDF(
       }
     }
 
-    doc.save(`GrainLink_SitePlannerReport_${customerName.replace(/\s+/g, '_')}.pdf`);
+    doc.save(`GrainLink_SitePlannerReport_${title.replace(/\s+/g, '_')}.pdf`);
     setLoading(false);
   } catch (err) {
     console.error(err);
