@@ -679,8 +679,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       if (type === 'chester-x' || type === 'chester-x1') return 1;
                       if (type === 'bin') return 2;
                       if (type === 'junction-box') return 3;
-                      if (type === 'zone') return 4;
-                      return 5;
+                      if (type === 'fan-control') return 4;
+                      if (type === 'zone') return 5;
+                      return 6;
                     };
                     const sortedAssets = [...allAssets].sort((a, b) => {
                       const wA = getSortWeight(a.bin.type);
@@ -693,6 +694,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       if (type === 'chester-x') return 'bg-red-500/10 text-red-500 border-red-500/20';
                       if (type === 'chester-x1') return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
                       if (type === 'junction-box') return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                      if (type === 'fan-control') return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
                       return 'bg-neutral-800 text-neutral-400 border-neutral-700';
                     };
                     const getBadgeLabel = (type: string) => {
@@ -700,6 +702,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       if (type === 'chester-x') return 'Chester-X';
                       if (type === 'chester-x1') return 'Chester-X1';
                       if (type === 'junction-box') return 'Junction Box';
+                      if (type === 'fan-control') return 'Fan Control';
                       return 'Cable Zone';
                     };
 
@@ -722,7 +725,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           Math.PI * Math.pow(D / 2, 2) * (Math.max(0, E - F) + (H - E) / 3) * 0.80356
                         );
                         capacityStr = `${cap.toLocaleString()} BU`;
-                      } else if (bin.type === 'chester-x' || bin.type === 'chester-x1' || bin.type === 'junction-box') {
+                      } else if (bin.type === 'chester-x' || bin.type === 'chester-x1' || bin.type === 'junction-box' || bin.type === 'fan-control') {
                         dimensionsStr = `${(bin as any).diameter || '10'}' Size`;
                       } else if (bin.type === 'zone') {
                         dimensionsStr = `${bin.width}' W x ${bin.height}' H`;

@@ -622,7 +622,7 @@ export async function generateUnifiedPDF(
       doc.setLineWidth(1);
       doc.setDrawColor(210, 210, 210);
       doc.setFillColor(252, 252, 253);
-      doc.rect(lgX, lgY, 345, 35, 'FD');
+      doc.rect(lgX, lgY, 450, 35, 'FD');
 
       doc.setLineWidth(1.5);
       doc.setDrawColor(220, 38, 38);
@@ -641,6 +641,11 @@ export async function generateUnifiedPDF(
       doc.line(lgX + 220, lgY + 10, lgX + 230, lgY + 25);
       doc.line(lgX + 230, lgY + 10, lgX + 220, lgY + 25);
       doc.text('Junction Box', lgX + 235, lgY + 20);
+
+      doc.setDrawColor(168, 85, 247);
+      doc.line(lgX + 330, lgY + 10, lgX + 340, lgY + 25);
+      doc.line(lgX + 340, lgY + 10, lgX + 330, lgY + 25);
+      doc.text('Fan Control', lgX + 345, lgY + 20);
 
       if (yard.bins.length > 0) {
         let minX = Infinity,
@@ -703,14 +708,16 @@ export async function generateUnifiedPDF(
           const px = bin.x * pdfScale + offsetX;
           const py = bin.y * pdfScale + offsetY;
 
-          if (bin.type === 'chester-x' || bin.type === 'chester-x1' || bin.type === 'junction-box') {
+          if (bin.type === 'chester-x' || bin.type === 'chester-x1' || bin.type === 'junction-box' || bin.type === 'fan-control') {
             doc.setLineWidth(2.5);
             if (bin.type === 'chester-x') {
               doc.setDrawColor(220, 38, 38);
             } else if (bin.type === 'chester-x1') {
               doc.setDrawColor(37, 99, 235);
-            } else {
+            } else if (bin.type === 'junction-box') {
               doc.setDrawColor(16, 185, 129); // Green/Emerald
+            } else {
+              doc.setDrawColor(168, 85, 247); // Purple/Violet for Fan Control
             }
             doc.line(px - r, py - r, px + r, py + r);
             doc.line(px + r, py - r, px - r, py + r);
@@ -755,9 +762,10 @@ export async function generateUnifiedPDF(
         const getAssetPriority = (type: string) => {
           if (type === 'chester-x' || type === 'chester-x1') return 1;
           if (type === 'junction-box') return 2;
-          if (type === 'bin') return 3;
-          if (type === 'zone') return 4;
-          return 5;
+          if (type === 'fan-control') return 3;
+          if (type === 'bin') return 4;
+          if (type === 'zone') return 5;
+          return 6;
         };
 
         const sortedBins = [...yard.bins].sort((a, b) => {
@@ -773,18 +781,22 @@ export async function generateUnifiedPDF(
               ? 'Chester-X1'
               : b.type === 'junction-box'
               ? 'Junction Box'
+              : b.type === 'fan-control'
+              ? 'Fan Control'
               : b.type === 'zone'
               ? 'Zone Box'
               : 'Standard Bin');
 
-          if (b.type === 'chester-x' || b.type === 'chester-x1' || b.type === 'junction-box') {
+          if (b.type === 'chester-x' || b.type === 'chester-x1' || b.type === 'junction-box' || b.type === 'fan-control') {
             return [
               fallbackName,
               b.type === 'chester-x'
                 ? 'Chester-X'
                 : b.type === 'chester-x1'
                 ? 'Chester-X1'
-                : 'Junction Box',
+                : b.type === 'junction-box'
+                ? 'Junction Box'
+                : 'Fan Control',
               `${b.diameter}' Size`,
               '-',
               '-',
