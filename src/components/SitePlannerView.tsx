@@ -158,7 +158,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
 
           // Draw helper circle indicator around aligned target object to emphasize connection
           const isZone = b.type === 'zone';
-          const defaultDia = b.type === 'junction-box' ? 6 : 5;
+          const defaultDia = (b.type === 'junction-box' || b.type === 'fan-control') ? 6 : 5;
           const dia = parseFloat((b as any).diameter) || defaultDia;
           const radius = isZone ? 0 : (dia / 2) * BASE_SCALE;
           if (!isZone) {
@@ -183,7 +183,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
 
           // Draw helper circle indicator around aligned target object to emphasize connection
           const isZone = b.type === 'zone';
-          const defaultDia = b.type === 'junction-box' ? 6 : 5;
+          const defaultDia = (b.type === 'junction-box' || b.type === 'fan-control') ? 6 : 5;
           const dia = parseFloat((b as any).diameter) || defaultDia;
           const radius = isZone ? 0 : (dia / 2) * BASE_SCALE;
           if (!isZone) {
@@ -239,11 +239,11 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       .filter((b) => b.type !== 'zone')
       .forEach((bin) => {
         const isSelected = selectedAssetId === bin.id;
-        const defaultDia = bin.type === 'junction-box' ? 6 : 5;
+        const defaultDia = (bin.type === 'junction-box' || bin.type === 'fan-control') ? 6 : 5;
         const dia = parseFloat((bin as any).diameter) || defaultDia;
         const radius = (dia / 2) * BASE_SCALE;
 
-        if (bin.type === 'chester-x' || bin.type === 'chester-x1' || bin.type === 'junction-box') {
+        if (bin.type === 'chester-x' || bin.type === 'chester-x1' || bin.type === 'junction-box' || bin.type === 'fan-control') {
           ctx.beginPath();
           ctx.moveTo(bin.x - radius, bin.y - radius);
           ctx.lineTo(bin.x + radius, bin.y + radius);
@@ -255,7 +255,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
               ? '#ef4444' 
               : bin.type === 'chester-x1' 
               ? '#3b82f6' 
-              : '#10b981'; // Green/Emerald for Junction Box
+              : bin.type === 'junction-box'
+              ? '#10b981'
+              : '#a855f7'; // Purple/Violet for Fan Control
           ctx.lineWidth = (isSelected ? 10 : 6) / view.scale;
           ctx.stroke();
 
@@ -279,7 +281,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           ctx.stroke();
         }
 
-        if (bin.name && bin.type !== 'chester-x' && bin.type !== 'chester-x1' && bin.type !== 'junction-box') {
+        if (bin.name && bin.type !== 'chester-x' && bin.type !== 'chester-x1' && bin.type !== 'junction-box' && bin.type !== 'fan-control') {
           ctx.font = `bold ${Math.max(12 / view.scale, 8)}px Inter`;
           ctx.fillStyle = isSelected ? '#f59e0b' : '#ffffff';
           ctx.textAlign = 'center';
@@ -352,7 +354,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     onSelectAsset(newBin.id);
   };
 
-  const handleAddSpecialMarker = (markerType: 'chester-x' | 'chester-x1' | 'junction-box') => {
+  const handleAddSpecialMarker = (markerType: 'chester-x' | 'chester-x1' | 'junction-box' | 'fan-control') => {
     if (!activeYard) return;
 
     const worldCenter = screenToWorld(dimensions.width / 2, dimensions.height / 2);
@@ -361,14 +363,16 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
         ? 'Chester-X' 
         : markerType === 'chester-x1' 
         ? 'Chester-X1' 
-        : 'Junction Box';
+        : markerType === 'junction-box'
+        ? 'Junction Box'
+        : 'Fan Control';
     const count = activeYard.bins.filter((b) => b.type === markerType).length + 1;
 
     const newMarker: MarkerAsset = {
       id: Date.now(),
       type: markerType,
       name: `${labelPrefix} ${count}`,
-      diameter: markerType === 'junction-box' ? '6' : '5',
+      diameter: (markerType === 'junction-box' || markerType === 'fan-control') ? '6' : '5',
       notes: '',
       x: snapToGrid ? Math.round(worldCenter.x / GRID_SIZE) * GRID_SIZE : worldCenter.x,
       y: snapToGrid ? Math.round(worldCenter.y / GRID_SIZE) * GRID_SIZE : worldCenter.y,
@@ -431,14 +435,16 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     let newName = '';
     if (selectedAsset.type === 'bin') {
       newName = `GB${binCountInYard}`;
-    } else if (selectedAsset.type === 'chester-x' || selectedAsset.type === 'chester-x1' || selectedAsset.type === 'junction-box') {
+    } else if (selectedAsset.type === 'chester-x' || selectedAsset.type === 'chester-x1' || selectedAsset.type === 'junction-box' || selectedAsset.type === 'fan-control') {
       const type = selectedAsset.type;
       const prefix = 
         type === 'chester-x' 
           ? 'Chester-X' 
           : type === 'chester-x1' 
           ? 'Chester-X1' 
-          : 'Junction Box';
+          : type === 'junction-box'
+          ? 'Junction Box'
+          : 'Fan Control';
       
       if (activeYard) {
         const currentName = selectedAsset.name || prefix;
@@ -987,6 +993,14 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                   <span className="font-black text-[11px] w-4 text-center shrink-0">JB</span>
                   <span className="text-neutral-300 font-bold text-[11px]">Junction Box</span>
                 </button>
+                <button
+                  onClick={() => handleAddSpecialMarker('fan-control')}
+                  className="flex items-center gap-2.5 w-full py-1.5 px-2.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:border-purple-500/50 hover:bg-purple-500/5 text-purple-400 text-xs font-bold transition-all cursor-pointer text-left"
+                  title="Quick Add Fan Control"
+                >
+                  <span className="font-black text-[11px] w-4 text-center shrink-0">FC</span>
+                  <span className="text-neutral-300 font-bold text-[11px]">Fan Control</span>
+                </button>
               </div>
             </div>
           </section>
@@ -1024,6 +1038,8 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                     ? 'Zone Properties'
                     : selectedAsset.type === 'junction-box'
                     ? 'Junction Box Properties'
+                    : selectedAsset.type === 'fan-control'
+                    ? 'Fan Control Properties'
                     : 'Marker Properties'}
                 </h2>
 
@@ -1285,7 +1301,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                   <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5 mb-2">
                     <span className="font-extrabold tracking-wide text-amber-400 text-sm">{hoveredBin.name || 'Marker'}</span>
                     <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded font-mono uppercase tracking-wider">
-                      {hoveredBin.type === 'chester-x' ? 'Chester-X' : hoveredBin.type === 'chester-x1' ? 'Chester-X1' : hoveredBin.type === 'junction-box' ? 'J-Box' : 'Marker'}
+                      {hoveredBin.type === 'chester-x' ? 'Chester-X' : hoveredBin.type === 'chester-x1' ? 'Chester-X1' : hoveredBin.type === 'junction-box' ? 'J-Box' : hoveredBin.type === 'fan-control' ? 'Fan Ctrl' : 'Marker'}
                     </span>
                   </div>
                   

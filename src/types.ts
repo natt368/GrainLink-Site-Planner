@@ -34,7 +34,7 @@ export interface BinAsset extends BaseAsset {
 }
 
 export interface MarkerAsset extends BaseAsset {
-  type: 'chester-x' | 'chester-x1' | 'junction-box';
+  type: 'chester-x' | 'chester-x1' | 'junction-box' | 'fan-control';
   diameter: string;
 }
 
