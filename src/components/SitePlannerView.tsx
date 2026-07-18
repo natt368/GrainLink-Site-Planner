@@ -63,6 +63,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   } | null>(null);
 
   const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredWireId, setHoveredWireId] = useState<number | null>(null);
 
   // Dragging / Interaction state
   const dragInfoRef = useRef<{
@@ -338,6 +339,34 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       ctx.setLineDash([5, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Draw small interactive delete button at the midpoint of the wire curve
+      const curveMidX = 0.25 * x1 + 0.5 * ctrlX + 0.25 * x2;
+      const curveMidY = 0.25 * y1 + 0.5 * ctrlY + 0.25 * y2;
+
+      ctx.save();
+      const isHovered = hoveredWireId === wire.id;
+      const btnRadius = 7 / view.scale;
+
+      ctx.beginPath();
+      ctx.arc(curveMidX, curveMidY, btnRadius, 0, Math.PI * 2);
+      ctx.fillStyle = isHovered ? '#ef4444' : '#171717';
+      ctx.strokeStyle = isHovered ? '#ffffff' : wireColor;
+      ctx.lineWidth = 1.5 / view.scale;
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw standard "x" cross inside
+      ctx.beginPath();
+      const xSize = 2.5 / view.scale;
+      ctx.moveTo(curveMidX - xSize, curveMidY - xSize);
+      ctx.lineTo(curveMidX + xSize, curveMidY + xSize);
+      ctx.moveTo(curveMidX + xSize, curveMidY - xSize);
+      ctx.lineTo(curveMidX - xSize, curveMidY + xSize);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5 / view.scale;
+      ctx.stroke();
+      ctx.restore();
     });
 
     // Draw active wiring preview line
@@ -740,6 +769,22 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
 
+    // If we clicked a wire's delete button, delete it
+    if (hoveredWireId !== null) {
+      onUpdateProject((prev) => ({
+        ...prev,
+        yards: prev.yards.map((y) => {
+          if (y.id !== prev.activeYardId) return y;
+          return {
+            ...y,
+            wires: (y.wires || []).filter((w) => w.id !== hoveredWireId),
+          };
+        }),
+      }));
+      setHoveredWireId(null);
+      return;
+    }
+
     // If wiring mode is active, handle node selection
     if (wiringState?.active) {
       const nonZones = activeYard.bins.filter((b) => b.type !== 'zone');
@@ -852,31 +897,74 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
 
     // Track hover information if not actively dragging/panning/resizing
     const isInteracting = dragInfoRef.current.active || panInfoRef.current.active || resizeInfoRef.current.active;
+
+    // Track hovered wire delete button
+    let foundHoveredWireId: number | null = null;
+    if (!isInteracting && !wiringState?.active) {
+      const wires = activeYard.wires || [];
+      for (const wire of wires) {
+        const fromAsset = activeYard.bins.find((b) => b.id === wire.fromId);
+        const toAsset = activeYard.bins.find((b) => b.id === wire.toId);
+        if (!fromAsset || !toAsset) continue;
+
+        const x1 = fromAsset.x;
+        const y1 = fromAsset.y;
+        const x2 = toAsset.x;
+        const y2 = toAsset.y;
+
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const offset = Math.max(30, len * 0.25);
+        const px = -dy / (len || 1);
+        const py = dx / (len || 1);
+
+        const ctrlX = midX + px * offset;
+        const ctrlY = midY + py * offset;
+
+        const curveMidX = 0.25 * x1 + 0.5 * ctrlX + 0.25 * x2;
+        const curveMidY = 0.25 * y1 + 0.5 * ctrlY + 0.25 * y2;
+
+        const dist = Math.sqrt(Math.pow(worldPos.x - curveMidX, 2) + Math.pow(worldPos.y - curveMidY, 2));
+        if (dist < 10 / view.scale) {
+          foundHoveredWireId = wire.id;
+          break;
+        }
+      }
+    }
+    setHoveredWireId(foundHoveredWireId);
+
     if (isInteracting) {
       setHoveredBin(null);
       setHoverPos(null);
     } else {
-      const nonZones = activeYard.bins.filter((b) => b.type !== 'zone');
-      const zones = activeYard.bins.filter((b) => b.type === 'zone');
+      let hovered = null;
+      if (foundHoveredWireId === null) {
+        const nonZones = activeYard.bins.filter((b) => b.type !== 'zone');
+        const zones = activeYard.bins.filter((b) => b.type === 'zone');
 
-      let hovered = [...nonZones].reverse().find((b) => {
-        const r = (parseFloat((b as any).diameter) / 2) * BASE_SCALE;
-        const dist = Math.sqrt(Math.pow(worldPos.x - b.x, 2) + Math.pow(worldPos.y - b.y, 2));
-        return dist < r;
-      });
-
-      if (!hovered) {
-        hovered = [...zones].reverse().find((b) => {
-          const zone = b as ZoneAsset;
-          const w = (parseFloat(zone.width) || 20) * BASE_SCALE;
-          const h = (parseFloat(zone.height) || 20) * BASE_SCALE;
-          return (
-            worldPos.x >= zone.x - w / 2 &&
-            worldPos.x <= zone.x + w / 2 &&
-            worldPos.y >= zone.y - h / 2 &&
-            worldPos.y <= zone.y + h / 2
-          );
+        hovered = [...nonZones].reverse().find((b) => {
+          const r = (parseFloat((b as any).diameter) / 2) * BASE_SCALE;
+          const dist = Math.sqrt(Math.pow(worldPos.x - b.x, 2) + Math.pow(worldPos.y - b.y, 2));
+          return dist < r;
         });
+
+        if (!hovered) {
+          hovered = [...zones].reverse().find((b) => {
+            const zone = b as ZoneAsset;
+            const w = (parseFloat(zone.width) || 20) * BASE_SCALE;
+            const h = (parseFloat(zone.height) || 20) * BASE_SCALE;
+            return (
+              worldPos.x >= zone.x - w / 2 &&
+              worldPos.x <= zone.x + w / 2 &&
+              worldPos.y >= zone.y - h / 2 &&
+              worldPos.y <= zone.y + h / 2
+            );
+          });
+        }
       }
 
       if (hovered) {
@@ -909,6 +997,8 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       canvasRef.current.style.cursor = 'se-resize';
     } else if (dragInfoRef.current.active) {
       canvasRef.current.style.cursor = 'grabbing';
+    } else if (foundHoveredWireId !== null) {
+      canvasRef.current.style.cursor = 'pointer';
     } else {
       canvasRef.current.style.cursor = 'grab';
     }
