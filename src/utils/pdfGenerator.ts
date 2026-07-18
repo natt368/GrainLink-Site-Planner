@@ -734,6 +734,71 @@ export async function generateUnifiedPDF(
             }
           }
         });
+
+        // Draw Wire Connections on PDF Layout
+        const wires = yard.wires || [];
+        wires.forEach((wire) => {
+          const fromAsset = yard.bins.find((b) => b.id === wire.fromId);
+          const toAsset = yard.bins.find((b) => b.id === wire.toId);
+          if (!fromAsset || !toAsset) return;
+
+          const p1x = fromAsset.x * pdfScale + offsetX;
+          const p1y = fromAsset.y * pdfScale + offsetY;
+          const p2x = toAsset.x * pdfScale + offsetX;
+          const p2y = toAsset.y * pdfScale + offsetY;
+
+          // Calculate control point for curved wires to bypass overlapping bins/markers
+          const midX = (p1x + p2x) / 2;
+          const midY = (p1y + p2y) / 2;
+
+          const dx = p2x - p1x;
+          const dy = p2y - p1y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          const offset = Math.max(30 * pdfScale, len * 0.25);
+          const px = -dy / (len || 1);
+          const py = dx / (len || 1);
+
+          const ctrlX = midX + px * offset;
+          const ctrlY = midY + py * offset;
+
+          doc.setLineWidth(1.0);
+          doc.setDrawColor(147, 51, 234); // Purple/Violet wire line color
+          if (typeof (doc as any).setLineDash === 'function') {
+            (doc as any).setLineDash([3, 2]);
+          }
+
+          // Draw curved wire using short line segments for maximum compatibility
+          const segments = 15;
+          let lastX = p1x;
+          let lastY = p1y;
+          for (let i = 1; i <= segments; i++) {
+            const t = i / segments;
+            const cx = (1 - t) * (1 - t) * p1x + 2 * (1 - t) * t * ctrlX + t * t * p2x;
+            const cy = (1 - t) * (1 - t) * p1y + 2 * (1 - t) * t * ctrlY + t * t * p2y;
+            doc.line(lastX, lastY, cx, cy);
+            lastX = cx;
+            lastY = cy;
+          }
+
+          if (typeof (doc as any).setLineDash === 'function') {
+            (doc as any).setLineDash([]);
+          }
+
+          // Draw midpoint label pill on the curved trajectory (t = 0.5)
+          const curveMidX = 0.25 * p1x + 0.5 * ctrlX + 0.25 * p2x;
+          const curveMidY = 0.25 * p1y + 0.5 * ctrlY + 0.25 * p2y;
+
+          doc.setFontSize(5);
+          doc.setTextColor(147, 51, 234);
+          doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(147, 51, 234);
+          doc.setLineWidth(0.3);
+
+          const labelText = wire.label || 'Wire';
+          const txtW = (doc as any).getTextWidth ? (doc as any).getTextWidth(labelText) : 10;
+          doc.rect(curveMidX - txtW / 2 - 1.5, curveMidY - 3, txtW + 3, 6, 'FD');
+          doc.text(labelText, curveMidX, curveMidY + 1.2, { align: 'center' });
+        });
       }
 
       if (options?.includeAssetDirectory) {
@@ -827,6 +892,23 @@ export async function generateUnifiedPDF(
             binB.radiusCable ? `${binB.radiusCable}'` : `${rec.radius} (Rec)`,
             binB.notes || '-',
           ];
+        });
+
+        // Add wire connections as assets in the directory table
+        const specTableWires = yard.wires || [];
+        specTableWires.forEach((wire) => {
+          const fromAsset = yard.bins.find((b) => b.id === wire.fromId);
+          const toAsset = yard.bins.find((b) => b.id === wire.toId);
+          const routeStr = fromAsset && toAsset ? `${fromAsset.name} -> ${toAsset.name}` : '-';
+          specTableRows.push([
+            wire.label || 'Wire Line',
+            'Wire Connection',
+            routeStr,
+            '-',
+            '-',
+            '-',
+            'Connected wire/cable between elements.',
+          ]);
         });
 
         autoTable(doc, {

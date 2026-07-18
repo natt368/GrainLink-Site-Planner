@@ -53,6 +53,17 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   const [hoveredBin, setHoveredBin] = useState<any | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
 
+  // State for creating wire connections
+  const [wiringState, setWiringState] = useState<{
+    active: boolean;
+    fromAssetId: number | null;
+    toAssetId: number | null;
+    showLabelInput?: boolean;
+    tempLabel?: string;
+  } | null>(null);
+
+  const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number } | null>(null);
+
   // Dragging / Interaction state
   const dragInfoRef = useRef<{
     active: boolean;
@@ -288,6 +299,116 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           ctx.fillText(bin.name, bin.x, bin.y + 4 / view.scale);
         }
       });
+
+    // Draw Wire Connections
+    const wires = activeYard.wires || [];
+    wires.forEach((wire) => {
+      const fromAsset = activeYard.bins.find((b) => b.id === wire.fromId);
+      const toAsset = activeYard.bins.find((b) => b.id === wire.toId);
+      if (!fromAsset || !toAsset) return;
+
+      const x1 = fromAsset.x;
+      const y1 = fromAsset.y;
+      const x2 = toAsset.x;
+      const y2 = toAsset.y;
+
+      // Calculate control point for curved wires to bypass overlapping bins/markers
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const offset = Math.max(30, len * 0.25);
+      const px = -dy / (len || 1);
+      const py = dx / (len || 1);
+
+      const ctrlX = midX + px * offset;
+      const ctrlY = midY + py * offset;
+
+      // Draw dashed purple wire curve
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.quadraticCurveTo(ctrlX, ctrlY, x2, y2);
+      ctx.strokeStyle = '#c084fc'; // soft purple
+      ctx.lineWidth = 2.5 / view.scale;
+      ctx.setLineDash([5, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw wire label at the curve midpoint (t = 0.5 on Bezier)
+      const curveMidX = 0.25 * x1 + 0.5 * ctrlX + 0.25 * x2;
+      const curveMidY = 0.25 * y1 + 0.5 * ctrlY + 0.25 * y2;
+
+      ctx.save();
+      ctx.font = `bold ${Math.max(9 / view.scale, 8)}px Inter`;
+      const labelText = wire.label || 'Wire';
+      const textWidth = ctx.measureText(labelText).width;
+      const paddingX = 5 / view.scale;
+      const paddingY = 3 / view.scale;
+      const rectW = textWidth + paddingX * 2;
+      const rectH = Math.max(12 / view.scale, 11);
+
+      // Draw pill background
+      ctx.fillStyle = '#18181b';
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 1 / view.scale;
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(curveMidX - rectW / 2, curveMidY - rectH / 2, rectW, rectH, 3 / view.scale);
+      } else {
+        ctx.rect(curveMidX - rectW / 2, curveMidY - rectH / 2, rectW, rectH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw text
+      ctx.fillStyle = '#f3e8ff'; // Light purple
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labelText, curveMidX, curveMidY);
+      ctx.restore();
+    });
+
+    // Draw active wiring preview line
+    if (wiringState?.active && wiringState.fromAssetId !== null && mouseWorldPos) {
+      const fromAsset = activeYard.bins.find((b) => b.id === wiringState.fromAssetId);
+      if (fromAsset) {
+        const x1 = fromAsset.x;
+        const y1 = fromAsset.y;
+        const x2 = mouseWorldPos.x;
+        const y2 = mouseWorldPos.y;
+
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const offset = Math.max(30, len * 0.25);
+        const px = -dy / (len || 1);
+        const py = dx / (len || 1);
+
+        const ctrlX = midX + px * offset;
+        const ctrlY = midY + py * offset;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, x2, y2);
+        ctx.strokeStyle = '#d8b4fe'; // bright purple for preview
+        ctx.lineWidth = 2 / view.scale;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw helper circle indicator on start asset
+        ctx.beginPath();
+        ctx.arc(fromAsset.x, fromAsset.y, 8 / view.scale, 0, Math.PI * 2);
+        ctx.strokeStyle = '#d8b4fe';
+        ctx.lineWidth = 1.5 / view.scale;
+        ctx.stroke();
+      }
+    }
 
     ctx.restore();
 
@@ -589,6 +710,33 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     }));
   };
 
+  const handleSaveWire = () => {
+    if (!activeYard || !wiringState || wiringState.fromAssetId === null || !wiringState.toAssetId) return;
+    const fromId = wiringState.fromAssetId;
+    const toId = wiringState.toAssetId;
+    const label = wiringState.tempLabel?.trim() || 'Wire Connection';
+
+    onUpdateProject((prev) => ({
+      ...prev,
+      yards: prev.yards.map((y) => {
+        if (y.id !== prev.activeYardId) return y;
+        const currentWires = y.wires || [];
+        const newWire = {
+          id: Date.now(),
+          fromId,
+          toId,
+          label,
+        };
+        return {
+          ...y,
+          wires: [...currentWires, newWire],
+        };
+      }),
+    }));
+
+    setWiringState(null);
+  };
+
   // Sync Shared Cable Lengths across bins with the same specifications
   const syncSharedCableLengths = (sourceBin: BinAsset) => {
     if (!sourceBin.centerCable && !sourceBin.radiusCable) return;
@@ -622,6 +770,42 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
+
+    // If wiring mode is active, handle node selection
+    if (wiringState?.active) {
+      const nonZones = activeYard.bins.filter((b) => b.type !== 'zone');
+      const zones = activeYard.bins.filter((b) => b.type === 'zone');
+      let clickedBin = [...nonZones].reverse().find((b) => {
+        const defaultDia = (b.type === 'junction-box' || b.type === 'fan-control') ? 6 : 5;
+        const dia = parseFloat((b as any).diameter) || defaultDia;
+        const r = (dia / 2) * BASE_SCALE;
+        const dist = Math.sqrt(Math.pow(worldPos.x - b.x, 2) + Math.pow(worldPos.y - b.y, 2));
+        return dist < r;
+      });
+
+      if (!clickedBin) {
+        clickedBin = [...zones].reverse().find((b) => {
+          const zone = b as ZoneAsset;
+          const w = (parseFloat(zone.width) || 20) * BASE_SCALE;
+          const h = (parseFloat(zone.height) || 20) * BASE_SCALE;
+          return (
+            worldPos.x >= zone.x - w / 2 &&
+            worldPos.x <= zone.x + w / 2 &&
+            worldPos.y >= zone.y - h / 2 &&
+            worldPos.y <= zone.y + h / 2
+          );
+        });
+      }
+
+      if (clickedBin) {
+        if (wiringState.fromAssetId === null) {
+          setWiringState({ ...wiringState, fromAssetId: clickedBin.id });
+        } else if (clickedBin.id !== wiringState.fromAssetId) {
+          setWiringState({ ...wiringState, toAssetId: clickedBin.id, showLabelInput: true });
+        }
+      }
+      return;
+    }
 
     // 1. Zone Resize handle check
     if (selectedAsset && selectedAsset.type === 'zone') {
@@ -692,6 +876,11 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
 
+    // If wiring is active, keep track of cursor world position for line previewing
+    if (wiringState?.active) {
+      setMouseWorldPos(worldPos);
+    }
+
     // Track hover information if not actively dragging/panning/resizing
     const isInteracting = dragInfoRef.current.active || panInfoRef.current.active || resizeInfoRef.current.active;
     if (isInteracting) {
@@ -745,7 +934,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       if (dist < 15) hoverResizeHandle = true;
     }
 
-    if (resizeInfoRef.current.active || hoverResizeHandle) {
+    if (wiringState?.active) {
+      canvasRef.current.style.cursor = 'crosshair';
+    } else if (resizeInfoRef.current.active || hoverResizeHandle) {
       canvasRef.current.style.cursor = 'se-resize';
     } else if (dragInfoRef.current.active) {
       canvasRef.current.style.cursor = 'grabbing';
@@ -1001,6 +1192,27 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                   <span className="font-black text-[11px] w-4 text-center shrink-0">FC</span>
                   <span className="text-neutral-300 font-bold text-[11px]">Fan Control</span>
                 </button>
+                <button
+                  onClick={() => {
+                    if (wiringState?.active) {
+                      setWiringState(null);
+                    } else {
+                      setWiringState({ active: true, fromAssetId: null, toAssetId: null });
+                      onSelectAsset(null);
+                    }
+                  }}
+                  className={`flex items-center gap-2.5 w-full py-1.5 px-2.5 rounded-lg border transition-all text-xs font-bold text-left cursor-pointer ${
+                    wiringState?.active
+                      ? 'border-purple-500 bg-purple-500/20 text-purple-400'
+                      : 'border-neutral-800 bg-neutral-900 hover:border-purple-500/50 hover:bg-purple-500/5 text-purple-400'
+                  }`}
+                  title="String electrical/signal wire from one bin or marker to a junction box"
+                >
+                  <span className="font-black text-sm w-4 text-center shrink-0">⚡</span>
+                  <span className="text-neutral-300 font-bold text-[11px]">
+                    {wiringState?.active ? 'Cancel Wiring' : 'String Wire Tool'}
+                  </span>
+                </button>
               </div>
             </div>
           </section>
@@ -1024,6 +1236,55 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
               ))}
             </div>
           </section>
+
+          {/* Active Wires / Connections List */}
+          {activeYard && activeYard.wires && activeYard.wires.length > 0 && (
+            <section className="border-t border-neutral-900 pt-3.5">
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-1.5">
+                <span>⚡</span> Yard Wires ({activeYard.wires.length})
+              </h2>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-0.5">
+                {activeYard.wires.map((wire) => {
+                  const fromAsset = activeYard.bins.find((b) => b.id === wire.fromId);
+                  const toAsset = activeYard.bins.find((b) => b.id === wire.toId);
+                  if (!fromAsset || !toAsset) return null;
+                  return (
+                    <div
+                      key={wire.id}
+                      className="bg-neutral-900 border border-neutral-800 rounded-lg p-2 flex items-center justify-between text-[11px] group"
+                    >
+                      <div className="truncate pr-1">
+                        <div className="font-extrabold text-purple-400 truncate text-[11px]" title={wire.label}>
+                          {wire.label || 'Wire Line'}
+                        </div>
+                        <div className="text-neutral-500 font-mono text-[9px] truncate">
+                          {fromAsset.name} → {toAsset.name}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          onUpdateProject((prev) => ({
+                            ...prev,
+                            yards: prev.yards.map((y) => {
+                              if (y.id !== prev.activeYardId) return y;
+                              return {
+                                ...y,
+                                wires: (y.wires || []).filter((w) => w.id !== wire.id),
+                              };
+                            }),
+                          }));
+                        }}
+                        className="p-1 hover:bg-neutral-800 hover:text-red-400 text-neutral-500 rounded transition-colors cursor-pointer shrink-0"
+                        title="Delete wire"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
 
 
@@ -1359,12 +1620,87 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
               {Math.round(view.scale * 100)}% Scale
             </span>
           </div>
-          <div className="hidden sm:flex bg-neutral-950/85 backdrop-blur-md px-4 py-2.5 rounded-xl border border-neutral-900 shadow-xl items-center gap-2">
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-              Click Bin to Design Cables
-            </span>
-          </div>
+          {wiringState?.active ? (
+            <div className="bg-purple-950/85 backdrop-blur-md px-4 py-2.5 rounded-xl border border-purple-500/30 shadow-xl flex items-center gap-2 animate-pulse">
+              <span className="text-purple-400">⚡</span>
+              <span className="text-[10px] font-black text-purple-300 uppercase tracking-widest">
+                {wiringState.fromAssetId === null
+                  ? 'Wiring Mode: Click on any Unit to START'
+                  : 'Wiring Mode: Click destination Unit to CONNECT'}
+              </span>
+              <button
+                onClick={() => setWiringState(null)}
+                className="ml-2 hover:bg-purple-900 text-purple-300 rounded px-1.5 py-0.5 text-[9px] font-black border border-purple-400/30 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="hidden sm:flex bg-neutral-950/85 backdrop-blur-md px-4 py-2.5 rounded-xl border border-neutral-900 shadow-xl items-center gap-2">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                Click Bin to Design Cables
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* Create Wire Connection Label Overlay */}
+        {wiringState?.active && wiringState.showLabelInput && wiringState.fromAssetId !== null && wiringState.toAssetId !== null && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-neutral-950 border border-neutral-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-fade-in text-white">
+              <div className="flex items-center gap-2.5 mb-4 border-b border-neutral-900 pb-3">
+                <span className="text-xl">⚡</span>
+                <div>
+                  <h3 className="font-extrabold text-sm tracking-wide text-purple-400">Label Your Wire Connection</h3>
+                  <p className="text-[10px] text-neutral-500 font-medium">Create a wire path from unit to unit</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">
+                    Connection Label
+                  </label>
+                  <input
+                    type="text"
+                    value={wiringState.tempLabel || ''}
+                    onChange={(e) => setWiringState({ ...wiringState, tempLabel: e.target.value })}
+                    placeholder="e.g. Bin 1 to J-Box A, Signal Line"
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg py-2 px-3 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500 transition-colors"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveWire();
+                      } else if (e.key === 'Escape') {
+                        setWiringState(null);
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-neutral-500 font-mono bg-neutral-900/50 p-2 rounded-lg border border-neutral-900">
+                  <span>From: {activeYard.bins.find((b) => b.id === wiringState.fromAssetId)?.name || 'Unit A'}</span>
+                  <span>To: {activeYard.bins.find((b) => b.id === wiringState.toAssetId)?.name || 'Unit B'}</span>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => setWiringState(null)}
+                    className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 border border-neutral-800 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveWire}
+                    className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-xs font-black transition-all cursor-pointer shadow-lg shadow-purple-600/10"
+                  >
+                    Save Connection
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="absolute bottom-6 left-6 flex flex-wrap items-center gap-3">
           <button
