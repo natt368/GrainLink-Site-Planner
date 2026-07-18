@@ -46,11 +46,19 @@ export interface ZoneAsset extends BaseAsset {
 
 export type Asset = BinAsset | MarkerAsset | ZoneAsset;
 
+export interface WireConnection {
+  id: number;
+  fromId: number;
+  toId: number;
+  type: 'cat5' | 'female-link';
+}
+
 export interface Yard {
   id: number;
   name: string;
   location?: string;
   bins: Asset[];
+  wires?: WireConnection[];
 }
 
 export interface Customer {

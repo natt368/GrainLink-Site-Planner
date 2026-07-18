@@ -762,7 +762,12 @@ export async function generateUnifiedPDF(
           const ctrlY = midY + py * offset;
 
           doc.setLineWidth(1.0);
-          doc.setDrawColor(147, 51, 234); // Purple/Violet wire line color
+          if (wire.type === 'cat5') {
+            doc.setDrawColor(59, 130, 246); // Blue for Cat5
+          } else {
+            doc.setDrawColor(244, 63, 94); // Rose/Magenta for Female Link Cable
+          }
+
           if (typeof (doc as any).setLineDash === 'function') {
             (doc as any).setLineDash([3, 2]);
           }
@@ -783,21 +788,6 @@ export async function generateUnifiedPDF(
           if (typeof (doc as any).setLineDash === 'function') {
             (doc as any).setLineDash([]);
           }
-
-          // Draw midpoint label pill on the curved trajectory (t = 0.5)
-          const curveMidX = 0.25 * p1x + 0.5 * ctrlX + 0.25 * p2x;
-          const curveMidY = 0.25 * p1y + 0.5 * ctrlY + 0.25 * p2y;
-
-          doc.setFontSize(5);
-          doc.setTextColor(147, 51, 234);
-          doc.setFillColor(255, 255, 255);
-          doc.setDrawColor(147, 51, 234);
-          doc.setLineWidth(0.3);
-
-          const labelText = wire.label || 'Wire';
-          const txtW = (doc as any).getTextWidth ? (doc as any).getTextWidth(labelText) : 10;
-          doc.rect(curveMidX - txtW / 2 - 1.5, curveMidY - 3, txtW + 3, 6, 'FD');
-          doc.text(labelText, curveMidX, curveMidY + 1.2, { align: 'center' });
         });
       }
 
@@ -900,14 +890,17 @@ export async function generateUnifiedPDF(
           const fromAsset = yard.bins.find((b) => b.id === wire.fromId);
           const toAsset = yard.bins.find((b) => b.id === wire.toId);
           const routeStr = fromAsset && toAsset ? `${fromAsset.name} -> ${toAsset.name}` : '-';
+          const wireLabel = wire.type === 'cat5' ? 'Cat5 Bin Wire' : 'Female Link Cable';
           specTableRows.push([
-            wire.label || 'Wire Line',
+            wireLabel,
             'Wire Connection',
             routeStr,
             '-',
             '-',
             '-',
-            'Connected wire/cable between elements.',
+            wire.type === 'cat5'
+              ? 'Blue Cat5 signal & power cable for bin nodes.'
+              : 'Rose female link cable interconnect line.',
           ]);
         });
 
