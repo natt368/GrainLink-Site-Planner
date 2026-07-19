@@ -65,10 +65,22 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number } | null>(null);
   const [hoveredWireId, setHoveredWireId] = useState<number | null>(null);
 
+  // Multi-selection states
+  const [selectionMode, setSelectionMode] = useState<'select' | 'pan'>('select');
+  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
+  const [selectionBox, setSelectionBox] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+
   // Dragging / Interaction state
   const dragInfoRef = useRef<{
     active: boolean;
     offset: { x: number; y: number };
+    startWorldPos?: { x: number; y: number };
+    startPositions?: { id: number; x: number; y: number }[];
   }>({ active: false, offset: { x: 0, y: 0 } });
 
   const panInfoRef = useRef<{
@@ -90,6 +102,32 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     if (!activeYard || selectedAssetId === null) return null;
     return activeYard.bins.find((b) => b.id === selectedAssetId) || null;
   }, [activeYard, selectedAssetId]);
+
+  // Synchronize with external selectedAssetId
+  useEffect(() => {
+    if (selectedAssetId === null) {
+      if (selectedAssetIds.length <= 1) {
+        setSelectedAssetIds([]);
+      }
+    } else {
+      if (!selectedAssetIds.includes(selectedAssetId)) {
+        setSelectedAssetIds([selectedAssetId]);
+      }
+    }
+  }, [selectedAssetId]);
+
+  // Helper helper function to change selected IDs
+  const handleSetSelectedAssetIds = (ids: number[]) => {
+    setSelectedAssetIds(ids);
+    if (ids.length === 1) {
+      onSelectAsset(ids[0]);
+    } else if (ids.length > 1) {
+      // Keep selectedAssetId as the last one so the properties panel still functions for it
+      onSelectAsset(ids[ids.length - 1]);
+    } else {
+      onSelectAsset(null);
+    }
+  };
 
   // Track resizing of container
   useEffect(() => {
@@ -214,7 +252,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       .filter((b) => b.type === 'zone')
       .forEach((bin) => {
         const zoneBin = bin as ZoneAsset;
-        const isSelected = selectedAssetId === zoneBin.id;
+        const isSelected = selectedAssetIds.includes(zoneBin.id) || selectedAssetId === zoneBin.id;
         const w = (parseFloat(zoneBin.width) || 20) * BASE_SCALE;
         const h = (parseFloat(zoneBin.height) || 20) * BASE_SCALE;
 
@@ -250,7 +288,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     activeYard.bins
       .filter((b) => b.type !== 'zone')
       .forEach((bin) => {
-        const isSelected = selectedAssetId === bin.id;
+        const isSelected = selectedAssetIds.includes(bin.id) || selectedAssetId === bin.id;
         const defaultDia = (bin.type === 'junction-box' || bin.type === 'fan-control') ? 6 : 5;
         const dia = parseFloat((bin as any).diameter) || defaultDia;
         const radius = (dia / 2) * BASE_SCALE;
@@ -409,11 +447,29 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       }
     }
 
+    // Draw selection box
+    if (selectionBox) {
+      const x1 = selectionBox.startX;
+      const y1 = selectionBox.startY;
+      const x2 = selectionBox.currentX;
+      const y2 = selectionBox.currentY;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.15)'; // Blue/indigo translucent background
+      ctx.strokeStyle = '#3b82f6'; // Bright blue border
+      ctx.lineWidth = 1.5 / view.scale;
+      ctx.beginPath();
+      ctx.rect(x1, y1, x2 - x1, y2 - y1);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.restore();
 
     // Draw Compass
     drawCompass(ctx, dimensions.width - 60, 60);
-  }, [dimensions, view, activeYard, selectedAssetId]);
+  }, [dimensions, view, activeYard, selectedAssetId, selectedAssetIds, selectionBox]);
 
   const drawCompass = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
     ctx.save();
@@ -532,43 +588,59 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   };
 
   const handleDeleteAsset = useCallback(() => {
-    if (selectedAssetId === null) return;
+    const idsToDelete = selectedAssetIds.length > 0
+      ? selectedAssetIds
+      : (selectedAssetId !== null ? [selectedAssetId] : []);
+
+    if (idsToDelete.length === 0) return;
+
     onUpdateProject((prev) => ({
       ...prev,
-      yards: prev.yards.map((y) =>
-        y.id === prev.activeYardId
-          ? { ...y, bins: y.bins.filter((b) => b.id !== selectedAssetId) }
-          : y
-      ),
+      yards: prev.yards.map((y) => {
+        if (y.id !== prev.activeYardId) return y;
+        return {
+          ...y,
+          bins: y.bins.filter((b) => !idsToDelete.includes(b.id)),
+          wires: (y.wires || []).filter((w) => !idsToDelete.includes(w.fromId) && !idsToDelete.includes(w.toId)),
+        };
+      }),
     }));
+
+    setSelectedAssetIds([]);
     onSelectAsset(null);
-  }, [selectedAssetId, onUpdateProject, onSelectAsset]);
+  }, [selectedAssetId, selectedAssetIds, onUpdateProject, onSelectAsset]);
 
   const handleDuplicateAsset = useCallback(() => {
-    if (selectedAssetId === null || !selectedAsset) return;
+    const idsToDuplicate = selectedAssetIds.length > 0
+      ? selectedAssetIds
+      : (selectedAssetId !== null ? [selectedAssetId] : []);
+
+    if (idsToDuplicate.length === 0 || !activeYard) return;
+
+    const binsToDup = activeYard.bins.filter((b) => idsToDuplicate.includes(b.id));
+    if (binsToDup.length === 0) return;
 
     let binCountInYard = 1;
     project.yards.forEach((y) => {
       binCountInYard += y.bins.filter((b) => b.type === 'bin').length;
     });
 
-    let newName = '';
-    if (selectedAsset.type === 'bin') {
-      newName = `GB${binCountInYard}`;
-    } else if (selectedAsset.type === 'chester-x' || selectedAsset.type === 'chester-x1' || selectedAsset.type === 'junction-box' || selectedAsset.type === 'fan-control') {
-      const type = selectedAsset.type;
-      const prefix = 
-        type === 'chester-x' 
-          ? 'Chester-X' 
-          : type === 'chester-x1' 
-          ? 'Chester-X1' 
-          : type === 'junction-box'
-          ? 'Junction Box'
-          : 'Fan Control';
-      
-      if (activeYard) {
-        const currentName = selectedAsset.name || prefix;
-        // Clean trailing (Copy) indicators
+    const newBins = binsToDup.map((b, index) => {
+      let newName = '';
+      if (b.type === 'bin') {
+        newName = `GB${binCountInYard + index}`;
+      } else if (b.type === 'chester-x' || b.type === 'chester-x1' || b.type === 'junction-box' || b.type === 'fan-control') {
+        const type = b.type;
+        const prefix = 
+          type === 'chester-x' 
+            ? 'Chester-X' 
+            : type === 'chester-x1' 
+            ? 'Chester-X1' 
+            : type === 'junction-box'
+            ? 'Junction Box'
+            : 'Fan Control';
+        
+        const currentName = b.name || prefix;
         const cleanName = currentName.replace(/\s*\(?copy\)?\s*$/i, '').trim();
         const numberMatch = cleanName.match(/^(.*?)\s+(\d+)$/);
         
@@ -581,11 +653,10 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           basePart = cleanName;
         }
 
-        // Search the active yard for existing assets of the same type starting with the same base part
-        const sameTypeBins = activeYard.bins.filter((b) => b.type === type);
+        const sameTypeBins = activeYard.bins.filter((sb) => sb.type === type);
         let maxNum = originalNum || 0;
-        sameTypeBins.forEach((b) => {
-          const bClean = b.name.replace(/\s*\(?copy\)?\s*$/i, '').trim();
+        sameTypeBins.forEach((sb) => {
+          const bClean = sb.name.replace(/\s*\(?copy\)?\s*$/i, '').trim();
           const match = bClean.match(new RegExp('^' + escapeRegExp(basePart) + '\\s+(\\d+)$', 'i'));
           if (match) {
             const num = parseInt(match[1], 10);
@@ -595,31 +666,31 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
           }
         });
 
-        const nextNum = maxNum > 0 ? maxNum + 1 : 2;
+        const nextNum = (maxNum > 0 ? maxNum : 1) + 1 + index;
         newName = `${basePart} ${nextNum}`;
       } else {
-        newName = `${prefix} 2`;
+        newName = b.name ? `${b.name} (Copy)` : '';
       }
-    } else {
-      newName = selectedAsset.name ? selectedAsset.name + ' (Copy)' : '';
-    }
 
-    const copy = {
-      ...JSON.parse(JSON.stringify(selectedAsset)),
-      id: Date.now(),
-      x: selectedAsset.x + 40,
-      y: selectedAsset.y + 40,
-      name: newName,
-    };
+      return {
+        ...JSON.parse(JSON.stringify(b)),
+        id: Date.now() + index,
+        x: b.x + 40,
+        y: b.y + 40,
+        name: newName,
+      };
+    });
 
     onUpdateProject((prev) => ({
       ...prev,
       yards: prev.yards.map((y) =>
-        y.id === prev.activeYardId ? { ...y, bins: [...y.bins, copy] } : y
+        y.id === prev.activeYardId ? { ...y, bins: [...y.bins, ...newBins] } : y
       ),
     }));
-    onSelectAsset(copy.id);
-  }, [selectedAssetId, selectedAsset, project, activeYard, onUpdateProject, onSelectAsset]);
+
+    const newIds = newBins.map((b) => b.id);
+    handleSetSelectedAssetIds(newIds);
+  }, [selectedAssetId, selectedAssetIds, project, activeYard, onUpdateProject]);
 
   // Setup Keyboard Shortcuts
   useEffect(() => {
@@ -634,22 +705,28 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
         return;
       }
 
+      const hasSelection = selectedAssetIds.length > 0 || selectedAssetId !== null;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedAssetId !== null) {
+        if (hasSelection) {
           handleDeleteAsset();
           e.preventDefault();
         }
       }
 
       if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
-        if (selectedAssetId !== null) {
+        if (hasSelection) {
           handleDuplicateAsset();
           e.preventDefault();
         }
       }
 
-      // Arrow key movement for selected asset
-      if (selectedAssetId !== null && selectedAsset) {
+      // Arrow key movement for selected assets
+      const idsToMove = selectedAssetIds.length > 0
+        ? selectedAssetIds
+        : (selectedAssetId !== null ? [selectedAssetId] : []);
+
+      if (idsToMove.length > 0) {
         let dx = 0;
         let dy = 0;
         const step = snapToGrid ? GRID_SIZE : 1;
@@ -672,7 +749,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
                 ? {
                     ...y,
                     bins: y.bins.map((b) =>
-                      b.id === selectedAssetId
+                      idsToMove.includes(b.id)
                         ? { ...b, x: b.x + dx, y: b.y + dy }
                         : b
                     ),
@@ -686,7 +763,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedAssetId, selectedAsset, onUpdateProject, handleDeleteAsset, handleDuplicateAsset]);
+  }, [selectedAssetId, selectedAssetIds, snapToGrid, onUpdateProject, handleDeleteAsset, handleDuplicateAsset]);
 
   const handleUpdateAssetProperty = (key: string, value: any) => {
     onUpdateProject((prev) => ({
@@ -759,6 +836,20 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
         }),
       })),
     }));
+  };
+
+  const getAssetsInSelectionBox = (box: { startX: number; startY: number; currentX: number; currentY: number }) => {
+    if (!activeYard) return [];
+    const minX = Math.min(box.startX, box.currentX);
+    const maxX = Math.max(box.startX, box.currentX);
+    const minY = Math.min(box.startY, box.currentY);
+    const maxY = Math.max(box.startY, box.currentY);
+
+    return activeYard.bins
+      .filter((b) => {
+        return b.x >= minX && b.x <= maxX && b.y >= minY && b.y <= maxY;
+      })
+      .map((b) => b.id);
   };
 
   // Mouse Interaction handlers
@@ -848,7 +939,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     const zones = activeYard.bins.filter((b) => b.type === 'zone');
 
     let clickedBin = [...nonZones].reverse().find((b) => {
-      const r = (parseFloat((b as any).diameter) / 2) * BASE_SCALE;
+      const defaultDia = (b.type === 'junction-box' || b.type === 'fan-control') ? 6 : 5;
+      const dia = parseFloat((b as any).diameter) || defaultDia;
+      const r = (dia / 2) * BASE_SCALE;
       const dist = Math.sqrt(Math.pow(worldPos.x - b.x, 2) + Math.pow(worldPos.y - b.y, 2));
       return dist < r;
     });
@@ -868,18 +961,55 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     }
 
     if (clickedBin) {
-      onSelectAsset(clickedBin.id);
+      const isShift = e.shiftKey;
+      let nextSelectedIds = [...selectedAssetIds];
+
+      if (isShift) {
+        if (nextSelectedIds.includes(clickedBin.id)) {
+          nextSelectedIds = nextSelectedIds.filter((id) => id !== clickedBin.id);
+        } else {
+          nextSelectedIds.push(clickedBin.id);
+        }
+      } else {
+        if (!nextSelectedIds.includes(clickedBin.id)) {
+          nextSelectedIds = [clickedBin.id];
+        }
+      }
+
+      handleSetSelectedAssetIds(nextSelectedIds);
+
+      const dragIds = nextSelectedIds.includes(clickedBin.id) ? nextSelectedIds : [clickedBin.id];
+
       dragInfoRef.current = {
         active: true,
         offset: { x: worldPos.x - clickedBin.x, y: worldPos.y - clickedBin.y },
+        startWorldPos: { x: worldPos.x, y: worldPos.y },
+        startPositions: dragIds.map((id) => {
+          const b = activeYard.bins.find((bin) => bin.id === id);
+          return { id, x: b?.x || 0, y: b?.y || 0 };
+        }),
       };
     } else {
-      // Pan layout
-      onSelectAsset(null);
-      panInfoRef.current = {
-        active: true,
-        start: { x: mouseX - view.x, y: mouseY - view.y },
-      };
+      // Empty space clicked
+      if (selectionMode === 'select') {
+        if (!e.shiftKey) {
+          handleSetSelectedAssetIds([]);
+        }
+        setSelectionBox({
+          startX: worldPos.x,
+          startY: worldPos.y,
+          currentX: worldPos.x,
+          currentY: worldPos.y,
+        });
+      } else {
+        if (!e.shiftKey) {
+          handleSetSelectedAssetIds([]);
+        }
+        panInfoRef.current = {
+          active: true,
+          start: { x: mouseX - view.x, y: mouseY - view.y },
+        };
+      }
     }
   };
 
@@ -893,6 +1023,16 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     // If wiring is active, keep track of cursor world position for line previewing
     if (wiringState?.active) {
       setMouseWorldPos(worldPos);
+    }
+
+    // Update selection box if active
+    if (selectionBox) {
+      setSelectionBox({
+        ...selectionBox,
+        currentX: worldPos.x,
+        currentY: worldPos.y,
+      });
+      return;
     }
 
     // Track hover information if not actively dragging/panning/resizing
@@ -947,7 +1087,9 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
         const zones = activeYard.bins.filter((b) => b.type === 'zone');
 
         hovered = [...nonZones].reverse().find((b) => {
-          const r = (parseFloat((b as any).diameter) / 2) * BASE_SCALE;
+          const defaultDia = (b.type === 'junction-box' || b.type === 'fan-control') ? 6 : 5;
+          const dia = parseFloat((b as any).diameter) || defaultDia;
+          const r = (dia / 2) * BASE_SCALE;
           const dist = Math.sqrt(Math.pow(worldPos.x - b.x, 2) + Math.pow(worldPos.y - b.y, 2));
           return dist < r;
         });
@@ -999,8 +1141,10 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       canvasRef.current.style.cursor = 'grabbing';
     } else if (foundHoveredWireId !== null) {
       canvasRef.current.style.cursor = 'pointer';
+    } else if (selectionBox) {
+      canvasRef.current.style.cursor = 'crosshair';
     } else {
-      canvasRef.current.style.cursor = 'grab';
+      canvasRef.current.style.cursor = selectionMode === 'pan' ? 'grab' : 'default';
     }
 
     // Process Drag / Resize / Pan
@@ -1034,47 +1178,55 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
             : y
         ),
       }));
-    } else if (dragInfoRef.current.active && selectedAssetId !== null) {
-      const nx = snapToGrid ? Math.round((worldPos.x - dragInfoRef.current.offset.x) / GRID_SIZE) * GRID_SIZE : (worldPos.x - dragInfoRef.current.offset.x);
-      const ny = snapToGrid ? Math.round((worldPos.y - dragInfoRef.current.offset.y) / GRID_SIZE) * GRID_SIZE : (worldPos.y - dragInfoRef.current.offset.y);
-
-      let targetX = nx;
-      let targetY = ny;
-
-      if (snapToObject) {
-        const SNAP_DISTANCE = 15; // Snapping distance in world coordinates
-
-        // Find closest X and Y coordinates to snap to
-        let closestXDist = SNAP_DISTANCE;
-        let closestYDist = SNAP_DISTANCE;
-
-        activeYard.bins.forEach((b) => {
-          if (b.id === selectedAssetId) return;
-
-          const dx = Math.abs(nx - b.x);
-          if (dx < closestXDist) {
-            closestXDist = dx;
-            targetX = b.x;
-          }
-
-          const dy = Math.abs(ny - b.y);
-          if (dy < closestYDist) {
-            closestYDist = dy;
-            targetY = b.y;
-          }
-        });
-      }
+    } else if (dragInfoRef.current.active && dragInfoRef.current.startPositions && dragInfoRef.current.startWorldPos) {
+      const dx = worldPos.x - dragInfoRef.current.startWorldPos.x;
+      const dy = worldPos.y - dragInfoRef.current.startWorldPos.y;
+      const isSingleDrag = dragInfoRef.current.startPositions.length === 1;
 
       onUpdateProject((prev) => ({
         ...prev,
-        yards: prev.yards.map((y) =>
-          y.id === prev.activeYardId
-            ? {
-                ...y,
-                bins: y.bins.map((b) => (b.id === selectedAssetId ? { ...b, x: targetX, y: targetY } : b)),
+        yards: prev.yards.map((y) => {
+          if (y.id !== prev.activeYardId) return y;
+          return {
+            ...y,
+            bins: y.bins.map((b) => {
+              const startPos = dragInfoRef.current.startPositions?.find((sp) => sp.id === b.id);
+              if (!startPos) return b;
+
+              let targetX = startPos.x + dx;
+              let targetY = startPos.y + dy;
+
+              if (snapToGrid) {
+                targetX = Math.round(targetX / GRID_SIZE) * GRID_SIZE;
+                targetY = Math.round(targetY / GRID_SIZE) * GRID_SIZE;
               }
-            : y
-        ),
+
+              if (isSingleDrag && snapToObject) {
+                const SNAP_DISTANCE = 15;
+                let closestXDist = SNAP_DISTANCE;
+                let closestYDist = SNAP_DISTANCE;
+
+                y.bins.forEach((otherB) => {
+                  if (otherB.id === b.id) return;
+
+                  const diffX = Math.abs(targetX - otherB.x);
+                  if (diffX < closestXDist) {
+                    closestXDist = diffX;
+                    targetX = otherB.x;
+                  }
+
+                  const diffY = Math.abs(targetY - otherB.y);
+                  if (diffY < closestYDist) {
+                    closestYDist = diffY;
+                    targetY = otherB.y;
+                  }
+                });
+              }
+
+              return { ...b, x: targetX, y: targetY };
+            }),
+          };
+        }),
       }));
     } else if (panInfoRef.current.active) {
       setView({
@@ -1085,10 +1237,28 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: React.MouseEvent<HTMLCanvasElement>) => {
     dragInfoRef.current.active = false;
     panInfoRef.current.active = false;
     resizeInfoRef.current.active = false;
+
+    if (selectionBox) {
+      const ids = getAssetsInSelectionBox(selectionBox);
+      const isShift = e ? e.shiftKey : false;
+
+      if (isShift) {
+        const union = [...selectedAssetIds];
+        ids.forEach((id) => {
+          if (!union.includes(id)) {
+            union.push(id);
+          }
+        });
+        handleSetSelectedAssetIds(union);
+      } else {
+        handleSetSelectedAssetIds(ids);
+      }
+      setSelectionBox(null);
+    }
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -1191,6 +1361,68 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
       {/* Planner Sidebar */}
       <aside className="w-52 bg-neutral-950 border-r border-neutral-900 flex flex-col z-10 shrink-0">
         <div className="flex-grow overflow-y-auto p-3.5 space-y-4 bg-neutral-950 custom-scrollbar">
+          {/* Planner Tools Section */}
+          <section>
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-2">
+              Planner Tools
+            </h2>
+            <div className="grid grid-cols-2 gap-1.5 w-full">
+              <button
+                onClick={() => setSelectionMode('select')}
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border transition-all text-xs font-bold cursor-pointer ${
+                  selectionMode === 'select'
+                    ? 'border-amber-500 bg-amber-500/20 text-amber-500'
+                    : 'border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-neutral-400'
+                }`}
+                title="Select and Drag assets. Shift+Click or drag box to select multiple."
+              >
+                <span className="font-bold text-xs">🖱️</span>
+                <span className="text-[10px] font-bold">Select</span>
+              </button>
+              <button
+                onClick={() => setSelectionMode('pan')}
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border transition-all text-xs font-bold cursor-pointer ${
+                  selectionMode === 'pan'
+                    ? 'border-amber-500 bg-amber-500/20 text-amber-500'
+                    : 'border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-amber-500/5 text-neutral-400'
+                }`}
+                title="Pan Canvas. Click and drag background to pan."
+              >
+                <span className="font-bold text-xs">✋</span>
+                <span className="text-[10px] font-bold">Pan</span>
+              </button>
+            </div>
+            {selectedAssetIds.length > 1 && (
+              <div className="mt-2.5 p-2 bg-neutral-900 border border-neutral-800 rounded-lg space-y-1.5">
+                <div className="text-[10px] text-neutral-400 font-bold flex justify-between items-center">
+                  <span>{selectedAssetIds.length} Assets Selected</span>
+                  <button
+                    onClick={() => handleSetSelectedAssetIds([])}
+                    className="text-[9px] text-neutral-500 hover:text-neutral-300 font-normal underline cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={handleDuplicateAsset}
+                    className="flex-1 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded text-[10px] font-extrabold transition-colors cursor-pointer text-center"
+                    title="Duplicate selected assets"
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    onClick={handleDeleteAsset}
+                    className="flex-1 py-1 bg-red-950/40 hover:bg-red-950/60 text-red-400 border border-red-900/50 rounded text-[10px] font-extrabold transition-colors cursor-pointer text-center"
+                    title="Delete selected assets"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* Markers and Zones */}
           <section>
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-2">
