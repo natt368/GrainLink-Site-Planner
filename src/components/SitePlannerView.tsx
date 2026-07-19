@@ -66,7 +66,7 @@ export const SitePlannerView: React.FC<SitePlannerViewProps> = ({
   const [hoveredWireId, setHoveredWireId] = useState<number | null>(null);
 
   // Multi-selection states
-  const [selectionMode, setSelectionMode] = useState<'select' | 'pan'>('select');
+  const [selectionMode, setSelectionMode] = useState<'select' | 'pan'>('pan');
   const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
   const [selectionBox, setSelectionBox] = useState<{
     startX: number;
